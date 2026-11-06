@@ -1,0 +1,8 @@
+{
+  "name": "take_screenshot",
+  "description": "Open the Windows snipping tool to capture part of the screen.",
+  "parameters": {},
+  "action": {"type": "keys", "keys": "windows+shift+s"},
+  "phrases": ["screenshot", "take a screenshot", "snip", "capture the screen"],
+  "keywords": ["screenshot", "snip", "screen", "picture", "capture"]
+}

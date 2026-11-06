@@ -1,0 +1,12 @@
+{
+  "name": "battery_level",
+  "description": "Report the battery charge of this computer.",
+  "parameters": {},
+  "action": {
+    "type": "powershell",
+    "script": "$b = Get-CimInstance Win32_Battery; if ($b) { \"Battery at $($b.EstimatedChargeRemaining)%\" } else { 'No battery found' }"
+  },
+  "phrases": ["battery", "battery level", "what's my battery", "what is my battery level"],
+  "safety": "run",
+  "keywords": ["battery", "charge", "power", "laptop"]
+}

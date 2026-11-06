@@ -1,0 +1,26 @@
+{
+  "name": "open_youtube",
+  "description": "Open YouTube, searching for a video if one is named.",
+  "parameters": {
+    "query": {"type": "string", "description": "What to search for", "required": false}
+  },
+  "action": {
+    "type": "open",
+    "target": "https://www.youtube.com/results?search_query={query}",
+    "empty_target": "https://www.youtube.com/"
+  },
+  "phrases": [
+    "youtube",
+    "open youtube",
+    "youtube {query}",
+    "search youtube for {query}",
+    "search youtube {query}",
+    "search on youtube for {query}",
+    "open youtube and search for {query}",
+    "open youtube and search {query}",
+    "find {query} on youtube",
+    "play {query} on youtube",
+    "look up {query} on youtube"
+  ],
+  "keywords": ["youtube", "video"]
+}

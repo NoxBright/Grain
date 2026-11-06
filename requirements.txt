@@ -1,0 +1,6 @@
+cactus-needle>=3.0.4
+pystray
+pillow
+sounddevice
+numpy
+keyboard

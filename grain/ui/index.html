@@ -1,0 +1,1859 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grain Tools</title>
+<link rel="icon" type="image/png" href="/ui/icon.png">
+<style>
+:root {
+  --bg: #f5f4ef; --panel: #ffffff; --raised: #fbfaf7; --text: #1d2125; --muted: #646b73; --faint: #8a9098;
+  --line: #e3e1d8; --accent: #a87a06; --accent-soft: #f6ecd2; --accent-text: #ffffff;
+  --ok: #23804f; --ok-soft: #e1f2e8; --warn: #a3620a; --warn-soft: #fbefd9; --bad: #b8382a; --bad-soft: #f9e1dd;
+  --chip: #efede6; --input: #ffffff; --focus: #d9a52c; --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 14px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #08050d; --panel: #1e2023; --raised: #23262a; --text: #e9e7e2; --muted: #a0a6ad; --faint: #7d838a;
+    --line: #32353a; --accent: #e3b341; --accent-soft: #3a3120; --accent-text: #1a1a1a;
+    --ok: #51c48a; --ok-soft: #1d3428; --warn: #f0ae4c; --warn-soft: #3a2f1c; --bad: #f07466; --bad-soft: #3d2320;
+    --chip: #2b2e33; --input: #17181b; --focus: #e3b341; --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #08050d; --panel: #1e2023; --raised: #23262a; --text: #e9e7e2; --muted: #a0a6ad; --faint: #7d838a;
+  --line: #32353a; --accent: #e3b341; --accent-soft: #3a3120; --accent-text: #1a1a1a;
+  --ok: #51c48a; --ok-soft: #1d3428; --warn: #f0ae4c; --warn-soft: #3a2f1c; --bad: #f07466; --bad-soft: #3d2320;
+  --chip: #2b2e33; --input: #17181b; --focus: #e3b341; --shadow: none;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { background: var(--bg); }
+body { margin: 0; background: transparent; color: var(--text); font: 14px/1.5 "Segoe UI", system-ui, sans-serif; }
+/* drifting sand behind the page; the panels sit on top */
+#sand { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none;
+  image-rendering: pixelated; image-rendering: crisp-edges; }
+button, input, select, textarea { font: inherit; color: inherit; }
+code, .mono { font-family: Consolas, ui-monospace, monospace; font-size: 12.5px; }
+
+/* header */
+header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 10px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 16px; }
+.brand img { width: 24px; height: 24px; image-rendering: pixelated; display: block; }
+.pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.pill { font-size: 12px; padding: 2px 9px; border-radius: 99px; background: var(--chip); color: var(--muted); white-space: nowrap; }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+nav { display: flex; gap: 2px; margin-left: auto; background: var(--chip); padding: 3px; border-radius: 9px; }
+nav button { border: 0; background: none; padding: 6px 14px; border-radius: 7px; cursor: pointer; color: var(--muted); }
+nav button.on { background: var(--panel); color: var(--text); font-weight: 600; box-shadow: var(--shadow); }
+nav .count { font-size: 11px; background: var(--accent); color: var(--accent-text); border-radius: 99px; padding: 0 6px; margin-left: 4px; }
+main { max-width: 1240px; margin: 0 auto; padding: 18px 16px 80px; }
+section { display: none; } section.on { display: block; }
+
+/* building blocks */
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; box-shadow: var(--shadow); }
+.panel + .panel { margin-top: 14px; }
+h2 { font-size: 15px; margin: 0; } h3 { font-size: 14px; margin: 0; }
+.sub { color: var(--muted); font-size: 13px; margin: 2px 0 0; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.grow { flex: 1; min-width: 0; }
+.muted { color: var(--muted); } .faint { color: var(--faint); } .small { font-size: 12.5px; }
+.ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+label.f { display: block; font-size: 12.5px; font-weight: 600; margin: 12px 0 5px; }
+label.f span { font-weight: 400; color: var(--muted); }
+input[type=text], input[type=number], input[type=search], select, textarea {
+  width: 100%; background: var(--input); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+textarea { font-family: Consolas, ui-monospace, monospace; font-size: 13px; min-height: 76px; resize: vertical; }
+input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+input:disabled, select:disabled, textarea:disabled { opacity: .75; }
+.invalid { border-color: var(--bad) !important; }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 7px 13px; cursor: pointer; white-space: nowrap; }
+.btn:hover { background: var(--chip); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+.btn.primary:hover { filter: brightness(1.05); }
+.btn.primary:disabled { opacity: .5; cursor: not-allowed; }
+.btn.ghost { border-color: transparent; background: none; }
+.btn.danger { color: var(--bad); }
+.btn.sm { padding: 3px 9px; font-size: 12.5px; border-radius: 7px; }
+.icon-btn { border: 0; background: none; color: var(--faint); cursor: pointer; padding: 4px 6px; border-radius: 6px; font-size: 15px; line-height: 1; }
+.icon-btn:hover { background: var(--chip); color: var(--bad); }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 99px; background: var(--chip); font-size: 12px; white-space: nowrap; }
+.chip.ok { background: var(--ok-soft); color: var(--ok); } .chip.warn { background: var(--warn-soft); color: var(--warn); }
+.chip.bad { background: var(--bad-soft); color: var(--bad); } .chip.accent { background: var(--accent-soft); color: var(--accent); }
+.empty { text-align: center; color: var(--muted); padding: 34px 10px; }
+.note { padding: 9px 12px; border-radius: 8px; background: var(--chip); font-size: 13px; }
+#k_list th, #k_list td { padding: 4px 16px 4px 0; text-align: left; font-size: 13px; }
+.note.warn { background: var(--warn-soft); color: var(--warn); } .note.bad { background: var(--bad-soft); color: var(--bad); }
+
+/* tools layout */
+.split { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 16px; align-items: start; }
+.list { position: sticky; top: 70px; max-height: calc(100vh - 90px); display: flex; flex-direction: column; padding: 12px; }
+.list-items { overflow-y: auto; margin: 8px -6px 0; padding: 0 6px; }
+.group-title { font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); margin: 14px 4px 4px; font-weight: 600; }
+.item { display: block; width: 100%; text-align: left; border: 1px solid transparent; background: none; border-radius: 9px; padding: 8px 10px; cursor: pointer; }
+.item:hover { background: var(--raised); }
+.item.on { background: var(--accent-soft); border-color: var(--accent); }
+.item .t { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.item .d { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .p { color: var(--faint); font-size: 12px; font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); display: inline-block; flex: none; }
+.dot.off { background: var(--line); }
+
+/* editor */
+.ed-head { display: flex; align-items: flex-start; gap: 10px; }
+.step { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 14px; }
+.step-title { display: flex; align-items: center; gap: 9px; }
+.step-num { width: 22px; height: 22px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.phrase-row, .param-row, .kv-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.phrase-row input { font-family: Consolas, ui-monospace, monospace; font-size: 13px; }
+.ph { color: var(--accent); font-weight: 600; }
+.param-card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; background: var(--raised); }
+.param-card .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.card { border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--raised); cursor: pointer; text-align: left; }
+.card:hover { border-color: var(--faint); }
+.card.on { border-color: var(--accent); background: var(--accent-soft); }
+.card b { display: block; font-size: 13px; } .card span { color: var(--muted); font-size: 12px; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.inserts { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; margin-top: 6px; font-size: 12.5px; }
+.inserts button { border: 1px dashed var(--accent); color: var(--accent); background: none; border-radius: 99px; padding: 0 9px; cursor: pointer; font-family: Consolas, ui-monospace, monospace; font-size: 12px; }
+.checks { margin-top: 14px; display: grid; gap: 5px; }
+.check { font-size: 13px; display: flex; gap: 7px; }
+.footer { position: sticky; bottom: 0; background: var(--panel); border-top: 1px solid var(--line); margin: 18px -18px -16px; padding: 12px 18px; border-radius: 0 0 12px 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.unsaved { color: var(--warn); font-size: 12.5px; }
+.test-box { background: var(--raised); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-top: 16px; }
+details summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-top: 16px; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+
+/* results, history */
+.result { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--raised); margin-top: 8px; }
+.hist { border-bottom: 1px solid var(--line); padding: 12px 2px; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+.hist:last-child { border-bottom: 0; }
+.filters { display: flex; gap: 4px; background: var(--chip); padding: 3px; border-radius: 8px; }
+.filters button { border: 0; background: none; padding: 4px 11px; border-radius: 6px; cursor: pointer; color: var(--muted); font-size: 13px; }
+.filters button.on { background: var(--panel); color: var(--text); font-weight: 600; }
+.fix { margin-top: 8px; padding: 10px; border-radius: 9px; background: var(--raised); border: 1px solid var(--line); }
+
+/* profiles */
+.tool-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 12px; margin-top: 8px; }
+.tool-grid label { display: flex; gap: 7px; align-items: center; font-size: 13px; padding: 3px 0; cursor: pointer; }
+.switch { display: inline-flex; gap: 7px; align-items: center; cursor: pointer; font-size: 13px; }
+
+/* settings and setup */
+.set-grid { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 10px 18px; align-items: center; margin-top: 10px; }
+.set-grid > label { font-weight: 600; font-size: 13px; }
+.set-grid .help { grid-column: 2; color: var(--muted); font-size: 12.5px; margin-top: -6px; }
+.meter { height: 10px; border-radius: 99px; background: var(--chip); overflow: hidden; margin-top: 8px; }
+.meter i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .3s; }
+.keycap { font-family: Consolas, ui-monospace, monospace; }
+.recording { outline: 2px solid var(--accent) !important; }
+.wizard-steps { display: flex; gap: 6px; margin: 4px 0 14px; }
+.wizard-steps i { flex: 1; height: 4px; border-radius: 99px; background: var(--chip); }
+.wizard-steps i.on { background: var(--accent); }
+@media (max-width: 700px) { .set-grid { grid-template-columns: 1fr; } .set-grid .help { grid-column: 1; } }
+
+/* guide */
+.guide { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 16px; align-items: start; }
+.toc { position: sticky; top: 70px; padding: 12px; }
+.toc a { display: block; padding: 5px 9px; border-radius: 7px; color: var(--muted); text-decoration: none; font-size: 13.5px; }
+.toc a:hover { background: var(--raised); color: var(--text); }
+.toc a.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.doc { line-height: 1.6; }
+.doc section.g { display: block; scroll-margin-top: 76px; }
+.doc section.g + section.g { margin-top: 14px; }
+.doc h2 { font-size: 18px; margin-bottom: 4px; }
+.doc h3 { font-size: 14.5px; margin: 18px 0 4px; }
+.doc p { margin: 6px 0; } .doc ul, .doc ol { margin: 6px 0; padding-left: 22px; } .doc li { margin: 3px 0; }
+.doc table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13.5px; }
+.doc th, .doc td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.doc th { color: var(--muted); font-size: 12px; font-weight: 600; }
+.doc kbd { font-family: inherit; font-size: 12px; background: var(--chip); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 6px; }
+.doc :not(pre) > code { background: var(--chip); border-radius: 5px; padding: 1px 5px; }
+.code { position: relative; margin: 8px 0; }
+.code pre { margin: 0; background: var(--input); border: 1px solid var(--line); border-radius: 9px; padding: 11px 13px; overflow-x: auto; font-family: Consolas, ui-monospace, monospace; font-size: 12.5px; line-height: 1.5; }
+.code .copy { position: absolute; top: 6px; right: 6px; font-size: 12px; padding: 2px 9px; }
+.callout { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 9px 13px; border-radius: 0 8px 8px 0; margin: 10px 0; font-size: 13.5px; }
+.callout.warn { border-color: var(--warn); background: var(--warn-soft); }
+.flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0; font-size: 13px; }
+.flow span { background: var(--raised); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; }
+.flow i { color: var(--faint); font-style: normal; }
+@media (max-width: 900px) { .guide { grid-template-columns: 1fr; } .toc { position: static; display: flex; flex-wrap: wrap; gap: 2px; } }
+
+.toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 9px 16px; border-radius: 9px; font-size: 13.5px; z-index: 20; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: calc(100vw - 32px); }
+.toast.show { opacity: 1; }
+.toast.bad { background: var(--bad); color: #fff; }
+dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--text); padding: 18px; width: min(680px, calc(100vw - 32px)); box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+dialog::backdrop { background: rgba(0,0,0,.35); }
+
+@media (max-width: 900px) {
+  .split { grid-template-columns: 1fr; }
+  .list { position: static; max-height: 360px; }
+  .hist { grid-template-columns: 1fr; }
+  nav { margin-left: 0; width: 100%; } nav button { flex: 1; padding: 6px 4px; }
+  .seg { grid-template-columns: 1fr; }
+  .param-card .grid { grid-template-columns: 1fr; }
+  .name-grid { grid-template-columns: 1fr !important; gap: 0 !important; }
+}
+</style>
+</head>
+<body>
+<canvas id="sand" aria-hidden="true"></canvas>
+<header>
+  <div class="brand"><img src="/ui/icon.png" alt="">Grain Tools</div>
+  <div class="pills" id="pills"><span class="pill">connecting…</span></div>
+  <nav id="tabs">
+    <button data-tab="tools" class="on">Tools</button>
+    <button data-tab="try">Try it</button>
+    <button data-tab="history">History<span class="count" id="reviewCount" hidden></span></button>
+    <button data-tab="profiles">Profiles</button>
+    <button data-tab="settings">Settings</button>
+    <button data-tab="guide">Guide</button>
+  </nav>
+</header>
+
+<main>
+  <div class="note bad" id="authError" hidden style="margin-bottom:14px">This page needs Grain's access key. Open it from the Grain tray icon → <b>Tool editor</b>.</div>
+
+  <!-- ============================================================ TOOLS -->
+  <section id="tools" class="on">
+    <div class="split">
+      <div class="panel list">
+        <div class="row">
+          <input type="search" id="toolSearch" class="grow" placeholder="Search tools and phrases">
+          <button class="btn primary" id="newToolBtn">+ New</button>
+        </div>
+        <div id="toolWarn"></div>
+        <div class="list-items" id="toolList"></div>
+      </div>
+      <div id="editorPane"></div>
+    </div>
+  </section>
+
+  <!-- ============================================================ TRY -->
+  <section id="try">
+    <div class="panel">
+      <h2>Try a command</h2>
+      <p class="sub">Type what you'd say to Grain. <b>Preview</b> shows what would happen without doing it.</p>
+      <div class="row" style="margin-top:12px">
+        <input type="text" id="tryText" class="grow" placeholder="e.g. search YouTube for hexapod robots" style="font-size:15px;padding:10px 12px">
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" id="tryPreview">Preview</button>
+        <button class="btn" id="tryRun" title="Actually runs the tool">Run it for real</button>
+        <span class="grow"></span>
+        <label class="small muted">Tools from <select id="tryProfile" style="width:auto;padding:4px 8px"></select></label>
+      </div>
+      <div id="tryResults"></div>
+    </div>
+    <div class="panel">
+      <h3>Waiting for your OK</h3>
+      <p class="sub">Tools set to "Ask me first" wait here. You can also say "yes" or "cancel".</p>
+      <div id="pendingList" style="margin-top:8px"></div>
+    </div>
+  </section>
+
+  <!-- ============================================================ HISTORY -->
+  <section id="history">
+    <div class="panel">
+      <div class="row">
+        <div class="grow"><h2>History</h2><p class="sub">Tell Grain when it got something right or wrong. Your answers become training data that makes the AI better at <i>your</i> commands.</p></div>
+        <button class="btn" id="downloadTraining">Download training data</button>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <div class="filters" id="histFilters">
+          <button data-f="review" class="on">Needs review</button><button data-f="all">All</button><button data-f="done">Reviewed</button>
+        </div>
+        <span class="grow"></span><span class="small muted" id="histStats"></span>
+      </div>
+      <div id="histList" style="margin-top:6px"></div>
+    </div>
+  </section>
+
+  <!-- ============================================================ PROFILES -->
+  <section id="profiles">
+    <div class="panel">
+      <h2>Which tools are listening</h2>
+      <p class="sub">The AI gets less accurate when it has too many tools to choose from. Profiles keep the list short: one for games, one for coding, and so on. Phrases work the same either way.</p>
+      <div class="row" style="margin-top:12px">
+        <label class="f" style="margin:0">Use</label>
+        <select id="activeProfile" style="width:auto"></select>
+        <span class="small muted" id="currentProfile"></span>
+      </div>
+    </div>
+    <div id="profileCards"></div>
+    <div class="row" style="margin-top:12px"><button class="btn" id="addProfile">+ Add profile</button></div>
+    <div class="panel" style="margin-top:14px">
+      <h3>Switch profile by app</h3>
+      <p class="sub">When "Automatic" is selected, the app in front decides. Use the program's file name, like <code>Code.exe</code> or <code>steam.exe</code>.</p>
+      <div id="ruleRows" style="margin-top:10px"></div>
+      <button class="btn sm" id="addRule">+ Add rule</button>
+    </div>
+    <div class="row" style="margin-top:14px"><button class="btn primary" id="saveProfiles">Save profiles</button><span class="unsaved" id="profilesDirty" hidden>Unsaved changes</span></div>
+  </section>
+
+  <!-- ============================================================ SETTINGS -->
+  <section id="settings">
+    <div class="panel">
+      <h2>Listening</h2>
+      <div class="set-grid">
+        <label for="s_hotkey">Hotkey</label>
+        <div class="row"><input type="text" id="s_hotkey" class="keycap grow" readonly><button class="btn" id="s_hotkeyRecord">Change…</button></div>
+        <div class="help">Press it, then speak. Click Change… and press the new keys together.</div>
+        <label for="s_wake">Wake word mode</label>
+        <label class="switch"><input type="checkbox" id="s_wake"> Listen all the time for the wake word</label>
+        <label for="s_wakeWords">Wake words</label>
+        <input type="text" id="s_wakeWords" placeholder="needle, hey needle">
+        <div class="help">Start a command with one of these when wake word mode is on. Comma separated.</div>
+        <label for="s_silence">Pause that ends a command</label>
+        <div class="row"><input type="range" id="s_silence" min="0.3" max="3" step="0.1" class="grow"><b id="s_silenceVal" style="width:50px;text-align:right"></b></div>
+        <label for="s_max">Longest command</label>
+        <div class="row"><input type="number" id="s_max" min="3" max="60" style="width:100px"> <span class="muted">seconds</span></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Microphone</h2>
+      <div class="set-grid">
+        <label for="s_mic">Microphone</label>
+        <div class="row"><select id="s_mic" class="grow"></select><button class="btn" id="s_micTest">Test</button></div>
+        <div class="help" id="s_micResult">Grain shares the microphone, so other apps keep working while it listens.</div>
+      </div>
+      <div class="meter"><i id="s_micMeter"></i></div>
+    </div>
+    <div class="panel">
+      <h2>The AI</h2>
+      <div class="set-grid">
+        <label for="s_conf">How sure it must be</label>
+        <div class="row"><input type="range" id="s_conf" min="0.1" max="0.95" step="0.05" class="grow"><b id="s_confVal" style="width:50px;text-align:right"></b></div>
+        <div class="help">Only for guesses, when nothing matched a phrase. Higher means fewer mistakes but more “not sure”.</div>
+        <label for="s_confirm">“Ask me first” waits</label>
+        <div class="row"><input type="number" id="s_confirm" min="5" max="300" style="width:100px"> <span class="muted">seconds for your yes</span></div>
+        <label for="s_model">Model file</label>
+        <input type="text" id="s_model" class="mono" placeholder="models\needle3.cact">
+        <div class="help">To use a fine-tuned model, put the .cact file in your models folder (button below) and enter its name, e.g. <code>models\my-model.cact</code>.</div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Startup and updates</h2>
+      <div class="set-grid">
+        <label for="s_startup">Start with Windows</label>
+        <label class="switch"><input type="checkbox" id="s_startup"> Start Grain when I sign in</label>
+        <label for="s_updates">Check for updates</label>
+        <label class="switch"><input type="checkbox" id="s_updates"> Check when Grain starts</label>
+        <div class="help">Off by default: Grain makes no internet connections unless you turn this on.</div>
+        <label for="s_updateUrl">Update address</label>
+        <div class="row"><input type="text" id="s_updateUrl" class="grow mono" placeholder="https://example.com/grain/latest.json"><button class="btn" id="s_checkNow">Check now</button></div>
+        <div class="help" id="s_updateResult"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>API and files</h2>
+      <div class="set-grid">
+        <label for="s_port">API port</label>
+        <div class="row"><input type="number" id="s_port" min="1024" max="65535" style="width:110px"> <span class="muted">takes effect after restarting Grain</span></div>
+        <label>Tool editor key</label>
+        <div class="row"><button class="btn" id="s_newKey">Make a new tool editor key</button><span class="muted small">This page's own key. Program keys aren't affected.</span></div>
+        <label>Folders</label>
+        <div class="row">
+          <button class="btn sm" data-open="data">Grain's data</button><button class="btn sm" data-open="tools">Tools</button>
+          <button class="btn sm" data-open="plugins">Plugins</button><button class="btn sm" data-open="models">Models</button>
+          <button class="btn sm" data-open="log">Log</button><button class="btn sm" data-open="notes">Notes</button>
+        </div>
+        <label>Setup</label>
+        <div class="row"><button class="btn sm" id="s_rerunSetup">Run the first-time setup again</button></div>
+      </div>
+      <p class="faint small" id="s_version" style="margin:14px 0 0"></p>
+    </div>
+    <div class="panel">
+      <h2>Program keys</h2>
+      <p class="help" style="margin:0 0 10px">Programs and scripts that use Grain's API each need a key of their own. A program key can add and remove that program's own tools, send requests and see their results. It can't change settings or tools, read your history, or approve anything Grain is asking you about. The key is shown once; Grain keeps only a fingerprint of it.</p>
+      <div class="row"><input type="text" id="k_client" class="grow mono" placeholder="program name, like my_robot"><button class="btn" id="k_make">Make key</button></div>
+      <div class="note" id="k_new" hidden style="margin-top:10px"></div>
+      <table id="k_list" style="margin-top:10px"></table>
+    </div>
+    <div class="row" style="margin-top:14px"><button class="btn primary" id="s_save">Save settings</button><span class="unsaved" id="s_dirty" hidden>● Unsaved changes</span></div>
+  </section>
+
+  <!-- ============================================================ GUIDE -->
+  <section id="guide">
+    <div class="guide">
+      <div class="panel toc" id="toc"></div>
+      <div class="doc" id="doc">
+
+<section class="g panel" id="g-start" data-title="Getting started">
+  <h2>Getting started</h2>
+  <p>Grain is a voice assistant that runs entirely on this computer. <b>Whistle</b> turns your speech into text, Grain checks it against your tools' phrases, and if nothing matches, <b>Needle</b> (a small AI) guesses which tool you meant. No internet needed, and nothing you say leaves your PC.</p>
+  <h3>Starting Grain</h3>
+  <ul>
+    <li>Install Grain with <b>Grain Setup</b>. It installs just for you (no administrator rights) and adds Grain to the Start menu. Your settings, history, notes and your own tools live separately in your data folder, <code>%APPDATA%\Grain</code>, so updating or reinstalling never loses them.</li>
+    <li>The first time Grain starts, a short setup opens here: choose and test your microphone, pick your hotkey, and decide whether Grain starts with Windows. You can run it again from <a href="#" data-goto="settings">Settings</a>.</li>
+    <li>A Grain icon appears in the system tray (near the clock; click <kbd>^</kbd> if it's hidden). The dot on it shows what Grain is doing:
+      <table><tr><th>Dot</th><th>Meaning</th></tr>
+        <tr><td>⚪ grey</td><td>Loading</td></tr><tr><td>🔵 blue</td><td>Ready, waiting for the hotkey</td></tr>
+        <tr><td>🟢 green</td><td>Ready, listening for the wake word</td></tr><tr><td>🔴 red</td><td>Listening to you</td></tr><tr><td>🟠 orange</td><td>Thinking</td></tr></table></li>
+    <li>Only one Grain runs at a time: starting it again just opens this tool editor.</li>
+    <li>To remove Grain: Windows <i>Settings → Apps → Installed apps → Grain → Uninstall</i>. Your data is kept unless you tick “also delete my settings”.</li>
+  </ul>
+  <h3>Talking to Grain</h3>
+  <ul>
+    <li><b>Hotkey:</b> press <kbd>__HOTKEY__</kbd> (or click the tray icon), then speak. Grain stops listening when you pause.</li>
+    <li><b>Wake word:</b> turn on <i>Wake word mode</i> in the tray menu, then start any command with <b>__WAKE__</b>, e.g. “__WAKE1__, open Steam”. This keeps the microphone open (other apps can still use it), and uses more CPU.</li>
+    <li>Chain commands with “then”: “open notepad <b>then</b> set a timer for five minutes”.</li>
+    <li>Results appear as Windows notifications. Everything is also logged in History.</li>
+    <li>The hotkey doesn't work while a window running <b>as administrator</b> is in front. Windows doesn't let ordinary programs see keys pressed in admin windows. Click another window first, or use wake word mode.</li>
+  </ul>
+  <h3>The tray menu</h3>
+  <table>
+    <tr><td><b>Listen now</b></td><td>Same as the hotkey.</td></tr>
+    <tr><td><b>Confirm / Cancel</b></td><td>Appears when a tool is waiting for your OK.</td></tr>
+    <tr><td><b>Wake word mode</b></td><td>Listen continuously for the wake word.</td></tr>
+    <tr><td><b>Profile</b></td><td>Which set of tools is listening. See <a href="#g-profiles">Profiles</a>.</td></tr>
+    <tr><td><b>Microphone</b></td><td>Pick a mic, or <i>Rescan devices</i> after plugging one in.</td></tr>
+    <tr><td><b>Tool editor</b></td><td>Opens this page.</td></tr>
+    <tr><td><b>Settings</b></td><td>Hotkey, microphone, wake words, startup and more. Changes apply straight away.</td></tr>
+    <tr><td><b>Open tools / plugins folder</b></td><td>Where your tools live.</td></tr>
+    <tr><td><b>Open notes / log</b></td><td>Notes you've dictated; Grain's technical log.</td></tr>
+    <tr><td><b>About Grain</b></td><td>Which version you have.</td></tr>
+  </table>
+</section>
+
+<section class="g panel" id="g-mic" data-title="Microphone and troubleshooting">
+  <h2>Microphone and troubleshooting</h2>
+  <p>Grain uses your microphone in <b>shared mode</b>, so calls, recorders and games keep working while it listens. Pick and test the mic in <a href="#" data-goto="settings">Settings</a>; the test tells you whether the level is good, too quiet or silent. Wake word mode costs very little while it waits (a few percent of one CPU core).</p>
+  <table>
+    <tr><th>You see</th><th>What it means and what to do</th></tr>
+    <tr><td>“No sound at all from …”</td><td>The mic is sending pure silence. It's unplugged, muted, or a virtual mic (for example from a remote-desktop or streaming app) that isn't receiving audio. Pick another mic, or turn on microphone sharing in that app's settings.</td></tr>
+    <tr><td>“Didn't hear anything”</td><td>Sound is arriving but Grain didn't detect speech within 5 seconds. Speak sooner or closer.</td></tr>
+    <tr><td>“No action for …”</td><td>Nothing matched. Check what Grain heard in History, then add a phrase for it.</td></tr>
+    <tr><td>“Not sure (0.42) … skipped”</td><td>The AI guessed but wasn't confident enough. Add a phrase so it doesn't need to guess, or a keyword if the tool's own words weren't in what you said.</td></tr><tr><td>“Couldn't run that: …”</td><td>The AI picked a tool but with a missing or impossible detail. The message says which. A phrase fixes it.</td></tr>
+    <tr><td>History shows “Thank you.” you didn't say</td><td>In wake-word mode, speech recognition sometimes hears a polite “Thank you.” in background noise. It's harmless: without the wake word, Grain ignores it. It's a known quirk, and we've decided to keep it because it's funny.</td></tr>
+    <tr><td>The hotkey does nothing</td><td>Is an administrator window in front? (See <a href="#g-start">Getting started</a>.) Otherwise another program may already use the same keys: pick a different hotkey in Settings.</td></tr>
+    <tr><td>A notification says a tool didn't load</td><td>A tool file or plugin has a mistake. The message says which; open it in this editor or check the plugin file.</td></tr>
+  </table>
+</section>
+
+<section class="g panel" id="g-how" data-title="How Grain decides">
+  <h2>How Grain decides what to do</h2>
+  <div class="flow"><span>🎙 You speak</span><i>→</i><span>Whistle writes it down</span><i>→</i><span>Split on “then”</span><i>→</i><span>Matches a phrase?</span><i>→</i><span>else: AI guesses</span><i>→</i><span>Sure enough?</span><i>→</i><span>Safety check</span><i>→</i><span>✅ Runs</span></div>
+  <ol>
+    <li><b>Phrases first.</b> If what you said fits one of a tool's phrases, Grain uses it straight away, with the exact words you said. This is fast and always right.</li>
+    <li><b>Otherwise the AI guesses</b> from the active profile's tool descriptions, and reports how sure it is (0–100%). Grain then checks the guess: unknown tools, missing details and wrong kinds of value (“louder” for up/down/mute) are refused with “Couldn't run that”, and spoken numbers like “twenty five” are converted.</li>
+    <li><b>Confidence check.</b> Guesses below <b>__THRESHOLD__%</b> are skipped (change <code>confidence_threshold</code>, or per tool under <i>More options</i>). If you didn't mention anything to do with the chosen tool (its name, keywords or phrase words), the AI must be at least 80% sure. That stops confident nonsense like “fire up Steam” turning into “pause the music”. Phrase matches always pass.</li>
+    <li><b>Safety.</b> “Just do it” tools run. “Ask me first” tools wait: say <b>yes</b> or <b>cancel</b>, or use the tray menu or the Try it tab, within __CONFIRM__ seconds. “Only when sure” tools need the AI to be at least 80% sure.</li>
+  </ol>
+  <div class="callout">The AI is small (121 million parameters) and gets less accurate with more tools to choose from. <b>Phrases</b> and <b>profiles</b> are the two biggest ways to make Grain reliable.</div>
+</section>
+
+<section class="g panel" id="g-tools" data-title="Making tools">
+  <h2>Making tools</h2>
+  <p>Open the <a href="#" data-goto="tools">Tools</a> tab and press <b>+ New</b>. Pick a template and fill in the steps. Your tool is saved as a file in your <code>tools</code> folder (<code>%APPDATA%\Grain\tools</code>) and works as soon as you save. No restart needed.</p>
+  <h3>Opening programs</h3>
+  <p>You don't need a tool for each program: “open …”, “launch …” or “start …” finds any program in your Start menu, e.g. “open Steam” or “launch Discord”. Nicknames like “VS Code” and “GOG” are in <code>plugins\apps.py</code>, where you can add your own.</p>
+  <h3>Writing good phrases</h3>
+  <ul>
+    <li>Write them the way you actually talk: “open YouTube”, “youtube {query}”, “play {query} on youtube”.</li>
+    <li>Add short and long versions. Grain picks the most specific phrase that fits.</li>
+    <li>A phrase must match <i>everything</i> you said (capitals and punctuation don't matter), so “open youtube please” needs its own phrase.</li>
+    <li><code>{word}</code> captures what you say there. Numbers can be spoken (“two” → 2). If a detail has <i>Only allow these</i> values, the spoken word must be one of them.</li>
+    <li>Check what Whistle actually heard in History, and add those spellings too (it might write “G.O.G.” for GOG).</li>
+  </ul>
+  <h3>Actions</h3>
+  <table>
+    <tr><th>Action</th><th>Use it for</th><th>Notes</th></tr>
+    <tr><td>Open something</td><td>Websites, files, folders, programs</td><td><code>start:Steam</code> opens a Start-menu app by name. Details in a web address are made web-safe. In a tool file, <code>"empty_target"</code> is opened instead when no details were said (e.g. YouTube's home page).</td></tr>
+    <tr><td>Press keys / type</td><td>Shortcuts, dictation</td><td>Keys like <code>ctrl+shift+t</code>, <code>windows+d</code>.</td></tr>
+    <tr><td>Send a web request</td><td>Robots, smart home, webhooks</td><td>JSON body; <code>"{steps}"</code> on its own keeps numbers as numbers.</td></tr>
+    <tr><td>Start a program</td><td>Programs with arguments</td><td>Never goes through a command shell. Asks first by default.</td></tr>
+    <tr><td>Run a script</td><td>Anything else (PowerShell)</td><td>Details arrive as <code>$env:GRAIN_name</code>. Asks first by default.</td></tr>
+  </table>
+  <h3>Tool files by hand</h3>
+  <p>Each tool is a JSON file in the tools folder; the editor writes the same format:</p>
+  <div class="code"><pre>{
+  "name": "open_youtube",
+  "description": "Open YouTube, searching for a video if one is named.",
+  "phrases": ["youtube {query}", "play {query} on youtube", "open youtube"],
+  "parameters": {"query": {"type": "string", "required": false}},
+  "action": {"type": "open", "target": "https://www.youtube.com/results?search_query={query}"},
+  "safety": "run"
+}</pre></div>
+</section>
+
+<section class="g panel" id="g-plugins" data-title="Python plugins">
+  <h2>Python plugins</h2>
+  <p>For tools that need real code, put a <code>.py</code> file in your <code>plugins</code> folder (<code>%APPDATA%\Grain\plugins</code>, or tray → <i>Open plugins folder</i>). Grain loads it immediately, and again whenever you save it.</p>
+  <div class="code"><pre>from typing import Literal
+from grain import tool, notify, open_target
+
+@tool(safety="confirm", phrases=["restart {service}", "restart the {service} server"])
+def restart_service(service: Literal["web", "database"]):
+    "Restart one of my local servers."
+    ...                      # your code here
+    return f"restarted {service}"   # shown as the notification</pre></div>
+  <ul>
+    <li>The docstring's first line is the description the AI reads. Type hints become details: <code>str</code>, <code>int</code>, <code>float</code>, <code>bool</code>, or <code>Literal[...]</code> for a fixed list.</li>
+    <li><code>open_target("start:Discord")</code> opens programs, files or URLs; <code>notify("...")</code> shows a tray notification later (timers, background jobs).</li>
+    <li>Plugins run on Grain's built-in Python, so they can use the standard library and the packages Grain includes, but not packages you install separately.</li>
+    <li>Examples: <code>plugins\apps.py</code> (opening programs, with an easy list to edit), <code>plugins\everyday.py</code>, <code>plugins\dice.py</code>.</li>
+  </ul>
+</section>
+
+<section class="g panel" id="g-profiles" data-title="Profiles">
+  <h2>Profiles</h2>
+  <p>A profile is the set of tools the AI <i>guesses</i> between when nothing matches a phrase. Fewer tools means better guesses. <b>Phrases work in every profile</b>, so “open Steam” works whether you're gaming or coding.</p><p>Grain comes with five: <b>default</b> (everyday tools), <b>gaming</b> (used automatically when Steam, GOG Galaxy or Discord is in front), <b>coding</b> (VS Code, Visual Studio or Terminal), <b>media</b> (Spotify or VLC) and <b>system</b> (lock, battery and Windows apps; pick it from the tray).</p>
+  <ul>
+    <li>Make profiles in the <a href="#" data-goto="profiles">Profiles</a> tab by ticking tools, e.g. <i>gaming</i> (open programs, media, volume) and <i>coding</i>.</li>
+    <li>Choose one in the tray menu, or set <b>Automatic</b> and add rules like “when <code>Code.exe</code> is in front, use <i>coding</i>”. The app in front when you press the hotkey decides.</li>
+    <li>Aim for about 10 tools or fewer per profile. The editor warns you past that.</li>
+  </ul>
+</section>
+
+<section class="g panel" id="g-train" data-title="Fine-tuning the AI">
+  <h2>Improving accuracy and fine-tuning</h2>
+  <p>Work through these in order; most people never need the last steps.</p>
+  <ol>
+    <li><b>Add phrases</b> for the commands you use most. This fixes most problems instantly.</li>
+    <li><b>Use profiles</b> to keep the tool list short.</li>
+    <li><b>Review History.</b> For each command, answer 👍 or 👎 and pick what it should have done. Each answer becomes a training example built from your real words.</li>
+    <li><b>Fine-tune</b> once you have a good number of reviewed examples: a few hundred at minimum. Cactus recommends about 1,000 training examples plus 100 each for validation and testing. Press <b>Download training data</b> in History to get <code>grain-training.jsonl</code>, in the format both options below accept.</li>
+  </ol>
+  <h3>Option A: train on this PC (free)</h3>
+  <p>Trains a small add-on (a LoRA adapter) for Needle on your own computer. Needs Python 3.9+ and a few GB of disk; a graphics card helps but isn't required. Open PowerShell in a folder of your choice first; the commands create a <code>train-env</code> folder there.</p>
+  <div class="code"><pre>py -m venv train-env
+train-env\Scripts\pip install "cactus-needle[train]"
+train-env\Scripts\needle finetune grain-training.jsonl --epochs 3 --out my-adapter.safetensors
+train-env\Scripts\needle build --lora my-adapter.safetensors --out models\needle3-mine.cact</pre></div>
+  <div class="callout warn">Locally trained models <b>don't report confidence</b>, so Grain can't skip unsure guesses: anything the AI picks will run. Set risky tools to <b>Ask me first</b> before switching.</div>
+  <h3>Option B: the Cactus platform (paid)</h3>
+  <p>Cactus trains the whole model on their GPUs, keeps the confidence score working, and can generate extra synthetic examples from your tools. When this was written: <b>Starter</b> $19 one-off (3 fine-tunes, 30 days), <b>Pro</b> $99/month. Check current prices at <code>cactuscompute.com/llms/pricing</code>. You buy a plan and create an API key at <code>cactuscompute.com/dashboard</code>, upload your training, validation and test files, and download the finished <code>.cact</code> model.</p>
+  <h3>Check it's actually better</h3>
+  <p>Before training, put about 10–20% of your examples in a separate test file and leave them out of training. Then score the old and new models on it:</p>
+  <div class="code"><pre>curl.exe -O https://cactuscompute.com/needle-fine-tuning/needle_eval.py
+train-env\Scripts\python needle_eval.py models\needle3.cact test.jsonl
+train-env\Scripts\python needle_eval.py models\needle3-mine.cact test.jsonl</pre></div>
+  <h3>Use your model</h3>
+  <ol>
+    <li>Put the <code>.cact</code> file in your models folder: <a href="#" data-goto="settings">Settings</a> → <i>Models</i> opens it (<code>%APPDATA%\Grain\models</code>).</li>
+    <li>In Settings, set <b>Model file</b> to <code>models\needle3-mine.cact</code> and save. It takes effect on the next command; no restart needed.</li>
+    <li>The model in use right now: <b>__MODEL__</b>. To go back, set it to <code>models\needle3.cact</code>.</li>
+  </ol>
+</section>
+
+<section class="g panel" id="g-api" data-title="Using the API">
+  <h2>Using the API</h2>
+  <p>Other programs and scripts on this PC can use Grain through its local API at <code>http://127.0.0.1:__PORT__</code>. It only accepts connections from this computer, and every request needs a key in an <code>Authorization: Bearer …</code> header.</p>
+  <p><b>Give each program its own key.</b> Make one in Settings → <i>Program keys</i> and hand it to the program, for example as its <code>GRAIN_API_KEY</code> environment variable. A program key can add and remove that program's own tools, send requests, and read Grain's status and the results of its own requests. It can't change settings or tools, read your history, or approve anything Grain is waiting to ask you about. Grain shows it once and keeps only a fingerprint of it; revoking it also removes the program's tools.</p>
+  <div class="row" style="margin:10px 0"><span class="small">This page's own key (don't give it to programs):</span><code id="tokenView">••••••••••••</code>
+    <button class="btn sm" id="tokenShow">Show</button><button class="btn sm" id="tokenCopy">Copy</button></div>
+  <p class="small muted">The tool editor key is stored as <code>api_token</code> in <code>%APPDATA%\Grain\settings.json</code> and can do everything. Registering a program's tools needs a program key. To change the tool editor key, use <i>Make a new tool editor key</i> in Settings.</p>
+  <h3>Send a command</h3>
+  <p>PowerShell, with the program key in <code>GRAIN_API_KEY</code>:</p>
+  <div class="code"><pre>$h = @{ Authorization = "Bearer $env:GRAIN_API_KEY" }
+Invoke-RestMethod http://127.0.0.1:__PORT__/v1/interpret -Method Post -Headers $h `
+  -ContentType "application/json" -Body '{"text": "open notepad", "execute": false}'</pre></div>
+  <p>Python:</p>
+  <div class="code"><pre>import json, os, urllib.request
+request = urllib.request.Request(
+    "http://127.0.0.1:__PORT__/v1/interpret", method="POST",
+    data=json.dumps({"text": "open notepad", "execute": False}).encode(),
+    headers={"Authorization": "Bearer " + os.environ["GRAIN_API_KEY"], "Content-Type": "application/json"})
+print(json.load(urllib.request.urlopen(request))["results"])</pre></div>
+  <p><code>"execute": false</code> previews; leave it out to really run the tool. Each result has the <code>calls</code> chosen, <code>confidence</code>, whether it <code>matched</code> a phrase, the <code>outcome</code> and a <code>message</code>.</p>
+  <h3>Give Grain tools from your own program</h3>
+  <p>A program can register tools and get called back when someone uses them. This is ideal for robots and devices. It needs a program key, and the tools belong to that key's program. Callbacks must be on this PC.</p>
+  <div class="code"><pre>POST /v1/tools
+{
+  "callback": "http://127.0.0.1:8790/",
+  "tools": [{
+    "name": "walk",
+    "description": "Walk the robot a number of steps in one direction.",
+    "parameters": {"direction": {"type": "string", "enum": ["forward", "back", "left", "right"]},
+                   "steps": {"type": "integer", "required": false}},
+    "phrases": ["walk {direction} {steps} steps", "walk {direction}"]
+  }]
+}</pre></div>
+  <p>When the tool is used, Grain sends <code>POST {"tool": "walk", "arguments": {"direction": "forward", "steps": 3}}</code> to your callback; reply with <code>{"result": "walked 3 steps"}</code> to show it in the notification. Remove your tools with <code>DELETE /v1/tools</code>. A complete working example is in <code>examples\remote_tool_client.py</code>.</p>
+  <h3>All endpoints</h3>
+  <table>
+    <tr><th>Request</th><th>What it does</th></tr>
+    <tr><td><code>GET /v1/status</code></td><td>Profile, tools listening, microphone, model, load errors</td></tr>
+    <tr><td><code>POST /v1/interpret</code></td><td><code>{text, execute?, profile?}</code>: understand (and run) a command</td></tr>
+    <tr><td><code>GET /v1/tools</code></td><td>Every tool, where it comes from, and whether it's listening</td></tr>
+    <tr><td><code>POST /v1/tools</code> · <code>DELETE /v1/tools?client=</code></td><td>Register or remove your program's tools</td></tr>
+    <tr><td><code>GET / PUT / DELETE /v1/tool_files/{name}</code></td><td>Read, create or delete a tool file</td></tr>
+    <tr><td><code>GET /v1/pending</code> · <code>POST /v1/pending/{id}/confirm</code> or <code>/cancel</code></td><td>Commands waiting for an OK</td></tr>
+    <tr><td><code>GET /v1/history</code> · <code>POST /v1/history/{id}/correction</code></td><td>The log, and your corrections: <code>{calls: [...]}</code>, or <code>[]</code> for “nothing”</td></tr>
+    <tr><td><code>GET /v1/training_data</code></td><td>Reviewed commands as fine-tuning data (JSONL)</td></tr>
+    <tr><td><code>GET / PUT /v1/profiles</code></td><td><code>{profiles, profile_rules, active_profile}</code></td></tr>
+    <tr><td><code>GET /v1/events?after=N&amp;timeout=25</code></td><td>Wait for new results (long polling)</td></tr>
+    <tr><td><code>GET / POST /v1/keys</code> · <code>DELETE /v1/keys/{id}</code></td><td>List, make (<code>{client}</code>) or revoke program keys</td></tr>
+  </table>
+  <p class="small">Program keys can use <code>GET /v1/status</code>, <code>POST /v1/interpret</code>, <code>POST</code> and <code>DELETE /v1/tools</code> (their own tools only) and <code>GET /v1/events</code> (their own results only). Everything else needs the tool editor key.</p>
+  <p class="small muted">Errors come back as <code>{"error": {"code", "message"}}</code> with status 400 (bad request), 401 (missing or unknown key), 403 (not from this PC, or not allowed with this key), 404, 409 (name already taken) or 413 (request too large).</p>
+</section>
+
+<section class="g panel" id="g-settings" data-title="Settings and files">
+  <h2>Settings and files</h2>
+  <p>Most settings are on the <a href="#" data-goto="settings">Settings</a> tab and apply straight away. Everything is stored in <code>%APPDATA%\Grain\settings.json</code>. If you edit that file by hand, quit Grain first, then start it again.</p>
+  <table>
+    <tr><th>Setting</th><th>What it does</th></tr>
+    <tr><td><code>hotkey</code></td><td>The listen shortcut. Now: <code>__HOTKEY__</code></td></tr>
+    <tr><td><code>wake_word_mode</code>, <code>wake_words</code></td><td>Continuous listening, and the words that start a command</td></tr>
+    <tr><td><code>confidence_threshold</code></td><td>How sure the AI must be when no phrase matched (0–1). Now: __THRESHOLD_RAW__</td></tr>
+    <tr><td><code>tool_thresholds</code></td><td>Per-tool overrides, e.g. <code>{"lock_computer": 0.7}</code></td></tr>
+    <tr><td><code>confirm_seconds</code></td><td>How long “Ask me first” tools wait for yes</td></tr>
+    <tr><td><code>silence_seconds</code>, <code>max_seconds</code></td><td>Pause that ends a command; longest command</td></tr>
+    <tr><td><code>input_device</code></td><td>Microphone (Settings or the tray menu)</td></tr>
+    <tr><td><code>apps</code>, <code>app_aliases</code></td><td>Windows apps for the built-in “open …” (every other program opens through <code>plugins\apps.py</code>)</td></tr>
+    <tr><td><code>check_for_updates</code>, <code>update_url</code></td><td>Optional update check (off by default, so Grain makes no internet connections)</td></tr>
+    <tr><td><code>needle_weights</code></td><td>Which AI model file to load</td></tr>
+    <tr><td><code>api_port</code>, <code>api_token</code>, <code>api_keys</code></td><td>The API's port, the tool editor's key, and the fingerprints of program keys</td></tr>
+    <tr><td><code>profiles</code>, <code>profile_rules</code>, <code>active_profile</code></td><td>Set from the Profiles tab</td></tr>
+  </table>
+  <h3>Files</h3>
+  <p>Your data folder, <code>%APPDATA%\Grain</code> (Settings has buttons to open each part):</p>
+  <table>
+    <tr><td><code>settings.json</code></td><td>All settings</td></tr>
+    <tr><td><code>tools\</code></td><td>Your tools (one .json each); the defaults are copied here on first run</td></tr>
+    <tr><td><code>plugins\</code></td><td>Python plugins</td></tr>
+    <tr><td><code>models\</code></td><td>Your own fine-tuned models</td></tr>
+    <tr><td><code>history.jsonl</code></td><td>Every command and your corrections</td></tr>
+    <tr><td><code>notes.md</code></td><td>Dictated notes</td></tr>
+    <tr><td><code>grain.log</code></td><td>Technical log, useful when something goes wrong (about 3 MB at most; never records what you say)</td></tr>
+  </table>
+  <p>The app itself is installed in <code>%LOCALAPPDATA%\Programs\Grain</code>, with the built-in AI and speech models, the licences (<code>THIRD_PARTY_NOTICES.txt</code>) and the uninstaller.</p>
+</section>
+
+      </div>
+    </div>
+  </section>
+</main>
+
+<dialog id="templateDialog">
+  <div class="row"><h2 class="grow">What should the new tool do?</h2><button class="icon-btn" data-close>✕</button></div>
+  <p class="sub">Pick a starting point. You can change everything afterwards.</p>
+  <div class="cards" id="templateCards" style="margin-top:14px"></div>
+</dialog>
+<dialog id="setupDialog">
+  <div class="wizard-steps" id="wizSteps"></div>
+  <div id="wizBody"></div>
+  <div class="row" style="margin-top:18px">
+    <button class="btn ghost" id="wizSkip">Skip setup</button><span class="grow"></span>
+    <button class="btn" id="wizBack">Back</button><button class="btn primary" id="wizNext">Next</button>
+  </div>
+</dialog>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+// ---------------------------------------------------------------- sand background
+// Pixel sand blown by noise-driven wind: 80 one-pixel grains with fading six-frame trails,
+// drawn 1:1 into a transparent canvas behind the page.
+(function sandBackground() {
+  const canvas = document.getElementById("sand");
+  const ctx = canvas.getContext("2d");
+  const COUNT = 80, TRAIL = 6;
+  const posX = new Float32Array(COUNT), posY = new Float32Array(COUNT);
+  const velX = new Float32Array(COUNT), velY = new Float32Array(COUNT), mass = new Float32Array(COUNT);
+  const trailX = new Float32Array(COUNT * TRAIL), trailY = new Float32Array(COUNT * TRAIL);
+  const darkQuery = matchMedia("(prefers-color-scheme: dark)");
+  const stillQuery = matchMedia("(prefers-reduced-motion: reduce)");
+  let width = 0, height = 0, image = null, pixels = null, time = 0, running = false;
+
+  // Grain colour as packed little-endian RGBA: pale yellow on dark, deep amber on light.
+  const grainColour = () => {
+    const theme = document.documentElement.dataset.theme;
+    const dark = theme ? theme === "dark" : darkQuery.matches;
+    return dark ? 0xe182f0ff : 0xff067aa8;
+  };
+  let colour = grainColour();
+
+  // 2D simplex noise for the swirling turbulence
+  const F2 = 0.5 * (Math.sqrt(3) - 1), G2 = (3 - Math.sqrt(3)) / 6;
+  const perm = new Uint8Array(512), permMod12 = new Uint8Array(512);
+  const seed = new Uint8Array(256).map(() => Math.floor(Math.random() * 256));
+  for (let i = 0; i < 512; i++) { perm[i] = seed[i & 255]; permMod12[i] = perm[i] % 12; }
+  const grad3 = new Float32Array([1, 1, -1, 1, 1, -1, -1, -1, 1, 0, -1, 0, 1, 0, -1, 0, 0, 1, 0, -1, 0, 1, 0, -1]);
+  function noise2D(xin, yin) {
+    const s = (xin + yin) * F2, i = Math.floor(xin + s), j = Math.floor(yin + s), t = (i + j) * G2;
+    const x0 = xin - (i - t), y0 = yin - (j - t);
+    const i1 = x0 > y0 ? 1 : 0, j1 = x0 > y0 ? 0 : 1;
+    const x1 = x0 - i1 + G2, y1 = y0 - j1 + G2, x2 = x0 - 1 + 2 * G2, y2 = y0 - 1 + 2 * G2;
+    const ii = i & 255, jj = j & 255;
+    let n = 0, c;
+    if ((c = 0.5 - x0 * x0 - y0 * y0) >= 0) { const g = permMod12[ii + perm[jj]] * 2; c *= c; n += c * c * (grad3[g] * x0 + grad3[g + 1] * y0); }
+    if ((c = 0.5 - x1 * x1 - y1 * y1) >= 0) { const g = permMod12[ii + i1 + perm[jj + j1]] * 2; c *= c; n += c * c * (grad3[g] * x1 + grad3[g + 1] * y1); }
+    if ((c = 0.5 - x2 * x2 - y2 * y2) >= 0) { const g = permMod12[ii + 1 + perm[jj + 1]] * 2; c *= c; n += c * c * (grad3[g] * x2 + grad3[g + 1] * y2); }
+    return 70 * n;
+  }
+
+  function spawn(i, anywhere) {
+    posX[i] = Math.random() * width;
+    posY[i] = anywhere ? Math.random() * height : -5;
+    velX[i] = 0.3 + Math.random() * 0.5;
+    velY[i] = (Math.random() - 0.5) * 0.2;
+    mass[i] = 0.6 + Math.random() * 0.8;
+    for (let t = 0; t < TRAIL; t++) { trailX[i * TRAIL + t] = posX[i]; trailY[i * TRAIL + t] = posY[i]; }
+  }
+
+  function resize() {
+    width = Math.max(1, innerWidth); height = Math.max(1, innerHeight);
+    canvas.width = width; canvas.height = height;
+    image = ctx.createImageData(width, height);
+    pixels = new Uint32Array(image.data.buffer);
+    for (let i = 0; i < COUNT; i++) spawn(i, true);
+    if (!running) draw(false);  // keep a still frame when motion is reduced
+  }
+
+  function plot(x, y, rgba) {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    if (ix >= 0 && ix < width && iy >= 0 && iy < height) pixels[iy * width + ix] = rgba;
+  }
+
+  function draw(move) {
+    pixels.fill(0);  // transparent, so the page background shows through
+    time += 0.008;
+    const windX = 1.76 + Math.sin(time * 0.8) * 0.55, windY = 0.3 + Math.cos(time * 0.5) * 0.15;
+    for (let i = 0; i < COUNT; i++) {
+      const base = i * TRAIL;
+      if (move) {
+        for (let t = TRAIL - 1; t > 0; t--) { trailX[base + t] = trailX[base + t - 1]; trailY[base + t] = trailY[base + t - 1]; }
+        trailX[base] = posX[i]; trailY[base] = posY[i];
+        const n = noise2D(posX[i] * 0.005, posY[i] * 0.005 + time) * Math.PI * 2;
+        const inv = 1 / mass[i];
+        const vx = (velX[i] + (windX + Math.cos(n) * 0.55) * inv * 0.03) * 0.94;
+        const vy = (velY[i] + (windY + Math.sin(n) * 0.55 + 0.05 * mass[i]) * inv * 0.03) * 0.94;
+        let nx = posX[i] + vx, ny = posY[i] + vy;
+        if (nx > width + 10 || ny > height + 10) {  // blown off: re-enter from the top or left edge
+          const fromTop = Math.random() < 0.6;
+          spawn(i, false);
+          posX[i] = fromTop ? Math.random() * width : -5;
+          posY[i] = fromTop ? -5 : Math.random() * height;
+        } else {
+          if (nx < -15) nx = width + 5;
+          if (ny < -10) ny = height + 5;
+          posX[i] = nx; posY[i] = ny; velX[i] = vx; velY[i] = vy;
+        }
+      }
+      for (let t = 0; t < TRAIL; t++) {  // trail fades from ~85% to ~12% opacity
+        const alpha = Math.floor(255 * (1 - (t + 1) / (TRAIL + 1)) * 0.85);
+        plot(trailX[base + t], trailY[base + t], (colour & 0x00ffffff) | (alpha << 24));
+      }
+      plot(posX[i], posY[i], colour);
+    }
+    ctx.putImageData(image, 0, 0);
+  }
+
+  function frame() {
+    if (!running) return;
+    draw(true);
+    requestAnimationFrame(frame);
+  }
+
+  function start() {
+    running = !stillQuery.matches;
+    if (running) requestAnimationFrame(frame); else draw(false);
+  }
+
+  addEventListener("resize", resize);
+  darkQuery.addEventListener("change", () => { colour = grainColour(); if (!running) draw(false); });
+  stillQuery.addEventListener("change", () => { running = false; start(); });
+  resize();
+  start();
+})();
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const NAME_RE = /^[a-z][a-z0-9_]{0,63}$/;
+const SOURCE_LABEL = {file: "Your tools", plugin: "Plugins", remote: "From other programs", builtin: "Built into Grain"};
+const TYPE_LABEL = {string: "Text", integer: "Whole number", number: "Number", boolean: "Yes / no"};
+const OUTCOME = {
+  executed: ["Ran", "ok"], confirmed: ["Ran after OK", "ok"], dry_run: ["Preview", "accent"], needs_confirm: ["Waiting for OK", "warn"],
+  low_confidence: ["Skipped: not sure", "warn"], no_call: ["No action", ""], cancelled: ["Cancelled", ""], expired: ["Expired", ""],
+  no_tools: ["No tools active", "bad"], nothing_pending: ["Nothing waiting", ""], invalid: ["Couldn't run", "bad"],
+};
+
+// ---------------------------------------------------------------- api + helpers
+const START_TAB = new URLSearchParams(location.search).get("tab");  // read before the address is tidied below
+let token = "";
+try {
+  const fromHash = new URLSearchParams(location.hash.slice(1)).get("token");
+  if (fromHash) { sessionStorage.setItem("grainToken", fromHash); history.replaceState(null, "", location.pathname); }
+  token = sessionStorage.getItem("grainToken") || "";
+} catch (e) { token = new URLSearchParams(location.hash.slice(1)).get("token") || ""; }
+
+async function api(method, path, body) {
+  const response = await fetch(path, {method, headers: {"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+                                      body: body === undefined ? undefined : JSON.stringify(body)});
+  if (response.status === 401) { $("authError").hidden = false; throw new Error("Not authorised"); }
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error ? data.error.message : response.statusText);
+  return data;
+}
+let toastTimer;
+function toast(message, bad) {
+  const t = $("toast"); t.textContent = message; t.className = "toast show" + (bad ? " bad" : "");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.className = "toast"; }, 3200);
+}
+const fmtArgs = (args) => Object.entries(args || {}).map(([k, v]) => `${k}: ${typeof v === "string" ? `"${v}"` : v}`).join(", ");
+const fmtCall = (c) => `${c.name.replace(/_/g, " ")}${Object.keys(c.arguments || {}).length ? ` (${fmtArgs(c.arguments)})` : ""}`;
+const fmtCalls = (calls) => calls && calls.length ? calls.map(fmtCall).join(" + ") : "nothing";
+const phraseText = (p) => typeof p === "string" ? p : (p.say || "");
+const placeholders = (s) => [...String(s).matchAll(/\{(\w+)\}/g)].map((m) => m[1]);
+const highlight = (s) => esc(s).replace(/\{(\w+)\}/g, '<span class="ph">{$1}</span>');
+const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").replace(/^(\d)/, "t_$1").slice(0, 64);
+
+function toShort(parameters) {
+  if (!parameters) return {};
+  if (parameters.type !== "object") return JSON.parse(JSON.stringify(parameters));
+  const required = parameters.required || [];
+  const out = {};
+  for (const [name, spec] of Object.entries(parameters.properties || {})) out[name] = {...spec, required: required.includes(name)};
+  return out;
+}
+
+// ---------------------------------------------------------------- tabs and status
+let currentTab = "tools";
+document.querySelectorAll("#tabs button").forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));
+function switchTab(tab) {
+  if (currentTab === "tools" && tab !== "tools" && !confirmLeave()) return;
+  currentTab = tab;
+  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
+  document.querySelectorAll("main > section").forEach((s) => s.classList.toggle("on", s.id === tab));
+  ({tools: loadTools, history: loadHistory, profiles: loadProfiles, try: loadTry, guide: loadGuide, settings: loadSettings})[tab]()
+    .catch((e) => toast(`Couldn't load ${tab}: ${e.message}`, true));
+}
+
+let status = {};
+async function loadStatus() {
+  try {
+    status = await api("GET", "/v1/status");
+    const active = status.active_tools.length;
+    $("pills").innerHTML = `<span class="pill">Profile: ${esc(status.profile)}</span>`
+      + `<span class="pill${status.too_many_tools ? " warn" : ""}" title="Tools the AI can choose from right now">${active} of ${status.tool_count} tools listening</span>`
+      + (status.mic ? `<span class="pill" title="Microphone">🎙 ${esc(status.mic)}</span>` : "")
+      + (status.pending ? `<span class="pill warn">${status.pending} waiting for OK</span>` : "");
+  } catch (e) { $("pills").innerHTML = `<span class="pill warn">Not connected</span>`; }
+}
+
+// ================================================================ TOOLS
+let tools = [], selected = null, editor = null;
+
+async function loadTools() {
+  await loadStatus();
+  tools = (await api("GET", "/v1/tools")).tools;
+  renderList();
+  if (!editor) renderWelcome();
+  else if (selected) { const fresh = tools.find((t) => t.name === selected); if (fresh && editor.readOnly) openTool(fresh, true); }
+}
+
+function renderList() {
+  const q = $("toolSearch").value.trim().toLowerCase();
+  const match = (t) => !q || [t.name, t.description, ...(t.phrases || []).map(phraseText)].join(" ").toLowerCase().includes(q);
+  const html = ["file", "plugin", "remote", "builtin"].map((source) => {
+    const group = tools.filter((t) => t.source === source && match(t));
+    if (!group.length) return "";
+    return `<div class="group-title">${SOURCE_LABEL[source]} · ${group.length}</div>` + group.map((t) => {
+      const example = (t.phrases || []).map(phraseText).find(Boolean);
+      return `<button class="item${t.name === selected ? " on" : ""}" data-name="${esc(t.name)}">
+        <div class="t"><span class="dot${t.active ? "" : " off"}" title="${t.active ? "Listening in this profile" : "Not in this profile"}"></span>${esc(t.name.replace(/_/g, " "))}
+          ${t.safety !== "run" ? `<span class="chip warn" style="margin-left:auto">${t.safety === "confirm" ? "asks first" : "only when sure"}</span>` : ""}</div>
+        <div class="d">${esc(t.description)}</div>
+        ${example ? `<div class="p">“${esc(example.replace(/\{(\w+)\}/g, "…"))}”</div>` : ""}</button>`;
+    }).join("");
+  }).join("");
+  $("toolList").innerHTML = html || `<div class="empty">No tools match “${esc(q)}”.</div>`;
+  $("toolList").querySelectorAll(".item").forEach((el) => el.addEventListener("click", () => {
+    if (!confirmLeave()) return;
+    openTool(tools.find((t) => t.name === el.dataset.name));
+  }));
+  $("toolWarn").innerHTML = (status.too_many_tools
+    ? `<div class="note warn small" style="margin-top:8px">${status.active_tools.length} tools are listening. The AI guesses better with about 10 or fewer, so consider <a href="#" id="goProfiles" style="color:inherit">splitting them into profiles</a>.</div>` : "")
+    + (status.load_errors && status.load_errors.length ? `<div class="note bad small" style="margin-top:8px">Couldn't load: ${status.load_errors.map(esc).join("; ")}</div>` : "");
+  const go = $("goProfiles"); if (go) go.addEventListener("click", (e) => { e.preventDefault(); switchTab("profiles"); });
+}
+$("toolSearch").addEventListener("input", renderList);
+
+function renderWelcome() {
+  $("editorPane").innerHTML = `<div class="panel"><div class="empty">
+    <h2 style="margin-bottom:6px">Pick a tool to see how it works</h2>
+    <p class="muted" style="max-width:440px;margin:0 auto 16px">Tools are the things Grain can do. Each one has phrases you can say, and an action it runs.</p>
+    <button class="btn primary" id="welcomeNew">+ Make a new tool</button></div></div>`;
+  $("welcomeNew").addEventListener("click", () => { if (confirmLeave()) $("templateDialog").showModal(); });
+}
+
+// ---------------------------------------------------------------- templates
+const TEMPLATES = [
+  {title: "Open a website", text: "Search or open a site", data: {name: "search_my_site", description: "Search my favourite site for something.",
+    phrases: ["search my site for {query}"], parameters: {query: {type: "string", description: "What to search for"}},
+    action: {type: "open", target: "https://example.com/search?q={query}"}}},
+  {title: "Open a program or file", text: "An .exe, document or folder", data: {name: "open_my_program", description: "Open my program.",
+    phrases: ["open my program"], parameters: {}, action: {type: "open", target: "C:\\Program Files\\My App\\app.exe"}}},
+  {title: "Press a shortcut", text: "Like Win+D or Ctrl+Shift+T", data: {name: "show_desktop", description: "Show the desktop.",
+    phrases: ["show desktop", "show the desktop"], parameters: {}, action: {type: "keys", keys: "windows+d"}}},
+  {title: "Type some text", text: "Dictate into any window", data: {name: "type_text", description: "Type text into the window in front.",
+    phrases: ["type {text}"], parameters: {text: {type: "string"}}, action: {type: "keys", text: "{text}"}}},
+  {title: "Run a script", text: "PowerShell, for anything else", data: {name: "my_script", description: "Run my PowerShell script.",
+    phrases: ["run my script"], parameters: {}, action: {type: "powershell", script: "Get-Date -Format t"}, safety: "confirm"}},
+  {title: "Talk to a device or service", text: "Robots, smart home, webhooks", data: {name: "robot_walk", description: "Walk the robot a number of steps in one direction.",
+    phrases: ["walk {direction} {steps} steps", "walk {direction}"],
+    parameters: {direction: {type: "string", enum: ["forward", "back", "left", "right"]}, steps: {type: "integer", required: false}},
+    action: {type: "http", method: "POST", url: "http://127.0.0.1:9000/walk", body: {direction: "{direction}", steps: "{steps}"}}}},
+  {title: "Start from scratch", text: "A blank tool", data: {name: "", description: "", phrases: [], parameters: {}, action: {type: "open", target: ""}}},
+];
+$("templateCards").innerHTML = TEMPLATES.map((t, i) => `<button class="card" data-i="${i}"><b>${esc(t.title)}</b><span>${esc(t.text)}</span></button>`).join("");
+$("templateCards").querySelectorAll(".card").forEach((c) => c.addEventListener("click", () => {
+  $("templateDialog").close();
+  const data = JSON.parse(JSON.stringify(TEMPLATES[c.dataset.i].data));
+  let name = data.name, n = 2;
+  while (name && tools.some((t) => t.name === name)) name = `${data.name}_${n++}`;
+  data.name = name;
+  openEditor(data, {isNew: true});
+}));
+document.querySelectorAll("dialog [data-close]").forEach((b) => b.addEventListener("click", () => b.closest("dialog").close()));
+$("newToolBtn").addEventListener("click", () => { if (confirmLeave()) $("templateDialog").showModal(); });
+
+// ---------------------------------------------------------------- editor
+const ACTIONS = {
+  open: {title: "Open something", text: "Website, file, folder or program", defaultSafety: "run"},
+  keys: {title: "Press keys / type", text: "Shortcuts or typing", defaultSafety: "run"},
+  http: {title: "Send a web request", text: "Devices, robots, services", defaultSafety: "run"},
+  run: {title: "Start a program", text: "With arguments", defaultSafety: "confirm"},
+  powershell: {title: "Run a script", text: "PowerShell", defaultSafety: "confirm"},
+};
+// The same rule as default_safety() in filetools.py: ask first when what's said decides which file
+// or program opens, or what gets typed.
+function defaultSafety(action) {
+  const hasPlaceholder = (s) => /\{\w+\}/.test(String(s || ""));
+  const isUrl = (t) => /^[a-z][a-z0-9+.-]*:/.test(t) && t.includes("://");
+  if (action.type === "open" && !isUrl(String(action.target || "")) && hasPlaceholder(action.target)) return "confirm";
+  if (action.type === "keys" && hasPlaceholder(action.text)) return "confirm";
+  return ACTIONS[action.type].defaultSafety;
+}
+const SAFETY = {
+  run: ["Just do it", "Runs as soon as Grain understands you."],
+  confirm: ["Ask me first", "Waits for you to say “yes” or press Confirm."],
+  strict: ["Only when sure", "Runs only when the AI is at least 80% sure. Phrases always count as sure."],
+};
+
+async function openTool(tool, keepScroll) {
+  selected = tool.name;
+  renderList();
+  if (tool.source === "file") {
+    try { openEditor(await api("GET", `/v1/tool_files/${tool.name}`), {original: tool.name}); }
+    catch (e) { toast(e.message, true); }
+  } else {
+    openEditor({name: tool.name, description: tool.description, phrases: tool.phrases || [], parameters: toShort(tool.parameters),
+                safety: tool.safety, threshold: tool.threshold, keywords: tool.keywords || []}, {readOnly: true, tool});
+  }
+  if (!keepScroll && window.innerWidth <= 900) $("editorPane").scrollIntoView({behavior: "smooth"});
+}
+
+function openEditor(data, opts = {}) {
+  data.parameters = toShort(data.parameters || {});
+  data.phrases = data.phrases || [];
+  data.action = data.action || {type: "open"};
+  editor = {data, original: opts.original || null, isNew: !!opts.isNew, readOnly: !!opts.readOnly, tool: opts.tool,
+            nameTouched: !opts.isNew || !!data.name, lastField: null};
+  if (opts.isNew) { selected = null; renderList(); }
+  renderEditor();
+  editor.snapshot = JSON.stringify(cleanData());
+  updateDirty();
+}
+
+function isDirty() { return editor && !editor.readOnly && JSON.stringify(cleanData()) !== editor.snapshot; }
+function confirmLeave() { return !isDirty() || confirm("You have unsaved changes to this tool. Discard them?"); }
+window.addEventListener("beforeunload", (e) => { if (isDirty()) { e.preventDefault(); e.returnValue = ""; } });
+
+function renderEditor() {
+  const d = editor.data, ro = editor.readOnly, dis = ro ? "disabled" : "";
+  const where = editor.tool ? ({plugin: `the plugin file <code>${esc(editor.tool.origin.split(/[\\/]/).pop())}</code> in Grain's plugins folder`,
+    remote: `the program <b>${esc(editor.tool.origin)}</b>, which registered it`, builtin: "Grain itself"})[editor.tool.source] : "";
+  $("editorPane").innerHTML = `<div class="panel" id="editorPanel">
+    <div class="ed-head">
+      <div class="grow">
+        <h2 style="font-size:17px">${editor.isNew ? "New tool" : esc(d.name.replace(/_/g, " "))}</h2>
+        <p class="sub">${ro ? `Comes from ${where}. You can read it here; change it at its source.` : editor.isNew ? "Fill in the steps below, then save." : "Saved in your tools folder. Changes apply as soon as you save."}</p>
+      </div>
+      ${editor.tool ? `<span class="chip">${esc(SOURCE_LABEL[editor.tool.source])}</span>` : ""}
+    </div>
+
+    <div class="step"><div class="step-title"><span class="step-num">1</span><h3>Name and purpose</h3></div>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:12px" class="name-grid">
+        <div><label class="f">Name <span>· letters, numbers, _</span></label><input type="text" id="e_name" value="${esc(d.name)}" ${dis} placeholder="open_my_site" class="mono"></div>
+        <div><label class="f">What does it do? <span>· the AI reads this to decide when to use it</span></label><input type="text" id="e_desc" value="${esc(d.description)}" ${dis} placeholder="Open my site, searching for something if given."></div>
+      </div>
+    </div>
+
+    <div class="step"><div class="step-title"><span class="step-num">2</span><h3 class="grow">What you say</h3></div>
+      <p class="sub">Phrases are matched exactly, so they always work. Put a word in curly brackets, like <span class="ph">{query}</span>, to capture whatever you say in that spot. Anything that doesn't match a phrase is left to the AI to work out.</p>
+      <div id="phraseRows" style="margin-top:10px"></div>
+      ${ro ? "" : `<div class="row"><input type="text" id="newPhrase" class="grow mono" placeholder="Add a phrase, e.g. search my site for {query}"><button class="btn sm" id="addPhrase">Add</button></div>`}
+    </div>
+
+    <div class="step"><div class="step-title"><span class="step-num">3</span><h3 class="grow">Details it needs</h3></div>
+      <p class="sub">Each <span class="ph">{word}</span> in a phrase becomes a detail here automatically. The AI fills these in too when it guesses.</p>
+      <div id="paramRows" style="margin-top:10px"></div>
+      ${ro ? "" : `<button class="btn sm" id="addParam">+ Add a detail</button>`}
+    </div>
+
+    ${ro ? `<div class="step"><div class="step-title"><span class="step-num">4</span><h3>What it does</h3></div>
+      <p class="sub">${editor.tool.source === "remote" ? "Grain sends the details to the program that registered it." : "Runs Python code."}</p></div>`
+    : `<div class="step"><div class="step-title"><span class="step-num">4</span><h3>What it does</h3></div>
+      <div class="cards" id="actionCards" style="margin-top:10px"></div>
+      <div id="actionFields"></div>
+      <div class="inserts" id="inserts"></div>
+    </div>`}
+
+    <div class="step"><div class="step-title"><span class="step-num">5</span><h3>Safety</h3></div>
+      <div class="seg" id="safetyCards" style="margin-top:10px"></div>
+    </div>
+
+    <details ${d.threshold != null || (d.keywords || []).length ? "open" : ""}><summary>More options</summary>
+      <label class="f">How sure must the AI be? <span>· only matters when no phrase matched</span></label>
+      <div class="row"><label class="switch"><input type="checkbox" id="e_thrDefault" ${d.threshold == null ? "checked" : ""} ${dis}> Use Grain's default</label>
+        <input type="range" id="e_thr" min="0.1" max="0.95" step="0.05" value="${d.threshold ?? 0.5}" class="grow" ${d.threshold == null || ro ? "disabled" : ""}>
+        <b id="e_thrVal" style="width:44px;text-align:right">${d.threshold == null ? "" : Math.round(d.threshold * 100) + "%"}</b></div>
+      <label class="f">Words to listen for <span>· helps speech recognition with unusual names, comma separated</span></label>
+      <input type="text" id="e_keywords" value="${esc((d.keywords || []).join(", "))}" ${dis} placeholder="youtube, hexapod">
+    </details>
+
+    <div class="checks" id="checks"></div>
+
+    <div class="test-box">
+      <h3>Test it</h3>
+      <div class="row" style="margin-top:8px">
+        <input type="text" id="e_test" class="grow" placeholder="Type something you'd say">
+        <button class="btn" id="e_testBtn">Test</button>
+      </div>
+      <div id="e_testResult" class="small" style="margin-top:6px"></div>
+    </div>
+
+    ${ro ? "" : `<div class="footer">
+      <button class="btn primary" id="saveBtn">Save</button>
+      <span class="unsaved" id="dirtyFlag" hidden>● Unsaved changes</span>
+      <span class="faint small" id="saveHint">Ctrl+S</span>
+      <span class="grow"></span>
+      ${editor.isNew ? `<button class="btn ghost" id="discardBtn">Discard</button>` : `<button class="btn danger" id="deleteBtn">Delete tool</button>`}
+    </div>`}
+  </div>`;
+
+  renderPhrases(); renderParams(); renderSafety();
+  if (!ro) { renderActionCards(); renderActionFields(); bindEditor(); }
+  bindTest();
+  validate();
+}
+
+function renderPhrases() {
+  const d = editor.data, ro = editor.readOnly;
+  $("phraseRows").innerHTML = d.phrases.length ? d.phrases.map((p, i) => {
+    if (typeof p !== "string") {
+      return `<div class="phrase-row"><div class="grow note small">“${esc(p.say)}” <span class="muted">→ always uses ${esc(fmtArgs(p.arguments))}</span></div>
+        ${ro ? "" : `<button class="icon-btn" data-del-phrase="${i}" title="Remove">✕</button>`}</div>`;
+    }
+    return ro ? `<div class="phrase-row"><div class="grow note mono small">${highlight(p)}</div></div>`
+      : `<div class="phrase-row"><input type="text" class="grow" data-phrase="${i}" value="${esc(p)}"><button class="icon-btn" data-del-phrase="${i}" title="Remove">✕</button></div>`;
+  }).join("") : `<div class="note warn small">No phrases yet. Without one, Grain relies on the AI guessing, which is much less reliable.</div>`;
+  if (ro) return;
+  $("phraseRows").querySelectorAll("[data-phrase]").forEach((el) => el.addEventListener("input", () => {
+    d.phrases[el.dataset.phrase] = el.value; syncParamsFromPhrases(); validate(); updateDirty();
+  }));
+  $("phraseRows").querySelectorAll("[data-del-phrase]").forEach((el) => el.addEventListener("click", () => {
+    d.phrases.splice(Number(el.dataset.delPhrase), 1); renderPhrases(); syncParamsFromPhrases(); validate(); updateDirty();
+  }));
+}
+
+function syncParamsFromPhrases() {
+  const d = editor.data;
+  const texts = d.phrases.filter((p) => typeof p === "string");
+  let added = false;
+  for (const name of new Set(texts.flatMap(placeholders))) {
+    if (!/^\w+$/.test(name) || d.parameters[name]) continue;
+    d.parameters[name] = {type: /^(count|steps|minutes|seconds|number|amount|level)$/.test(name) ? "integer" : "string",
+                          required: texts.every((t) => placeholders(t).includes(name))};
+    added = true;
+  }
+  if (added) renderParams();
+  else document.querySelectorAll("[data-unused]").forEach((el) => { el.hidden = isUsed(el.dataset.unused); });
+}
+
+function isUsed(name) {
+  const d = editor.data;
+  const inPhrases = d.phrases.some((p) => typeof p === "string" ? placeholders(p).includes(name) : p.arguments && name in p.arguments);
+  return inPhrases || JSON.stringify(d.action || {}).includes(`{${name}}`);
+}
+
+function renderParams() {
+  const d = editor.data, ro = editor.readOnly, dis = ro ? "disabled" : "";
+  const names = Object.keys(d.parameters);
+  $("paramRows").innerHTML = names.length ? names.map((name) => {
+    const s = d.parameters[name];
+    return `<div class="param-card" data-param="${esc(name)}">
+      <div class="row"><b class="mono ph">{${esc(name)}}</b>
+        <span class="chip" style="margin-left:4px">${TYPE_LABEL[s.type] || s.type}${s.enum ? " · choice" : ""}</span>
+        ${s.required === false ? `<span class="chip">optional</span>` : ""}
+        <span class="chip warn" data-unused="${esc(name)}" ${isUsed(name) || ro ? "hidden" : ""} title="No phrase or action uses this">not used yet</span>
+        <span class="grow"></span>${ro ? "" : `<button class="icon-btn" data-del-param="${esc(name)}" title="Remove">✕</button>`}</div>
+      <div class="grid">
+        <div><label class="f" style="margin-top:0">Kind</label><select data-k="type" ${dis}>${Object.entries(TYPE_LABEL).map(([v, l]) => `<option value="${v}" ${s.type === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+        <div><label class="f" style="margin-top:0">Only allow these <span>· comma separated, optional</span></label><input type="text" data-k="enum" value="${esc((s.enum || []).join(", "))}" ${dis} placeholder="forward, back, left, right"></div>
+        <div><label class="f" style="margin-top:0">Hint for the AI <span>· optional</span></label><input type="text" data-k="description" value="${esc(s.description || "")}" ${dis} placeholder="What to search for"></div>
+        <div><label class="f" style="margin-top:0">&nbsp;</label><label class="switch"><input type="checkbox" data-k="required" ${s.required !== false ? "checked" : ""} ${dis}> Always needed</label></div>
+      </div></div>`;
+  }).join("") : `<div class="muted small">This tool doesn't need any details.</div>`;
+  if (ro) return;
+  $("paramRows").querySelectorAll(".param-card").forEach((card) => {
+    const s = d.parameters[card.dataset.param];
+    card.querySelectorAll("[data-k]").forEach((el) => el.addEventListener(el.type === "checkbox" || el.tagName === "SELECT" ? "change" : "input", () => {
+      const k = el.dataset.k;
+      if (k === "required") s.required = el.checked;
+      else if (k === "enum") { const v = el.value.split(",").map((x) => x.trim()).filter(Boolean); if (v.length) s.enum = v; else delete s.enum; }
+      else if (k === "description") { if (el.value.trim()) s.description = el.value; else delete s.description; }
+      else s.type = el.value;
+      if (k !== "description" && k !== "enum") renderParams();
+      validate(); updateDirty();
+    }));
+  });
+  $("paramRows").querySelectorAll("[data-del-param]").forEach((el) => el.addEventListener("click", () => {
+    delete d.parameters[el.dataset.delParam]; renderParams(); renderInserts(); validate(); updateDirty();
+  }));
+  renderInserts();
+}
+
+function renderActionCards() {
+  const type = editor.data.action.type;
+  $("actionCards").innerHTML = Object.entries(ACTIONS).map(([k, a]) => `<button class="card${k === type ? " on" : ""}" data-action="${k}"><b>${a.title}</b><span>${a.text}</span></button>`).join("");
+  $("actionCards").querySelectorAll(".card").forEach((c) => c.addEventListener("click", () => {
+    if (c.dataset.action === editor.data.action.type) return;
+    editor.data.action = {type: c.dataset.action};
+    renderActionCards(); renderActionFields(); renderSafety(); validate(); updateDirty();
+  }));
+}
+
+const FIELDS = {
+  open: [["target", "Website, file, folder or program", "https://www.example.com/search?q={query}", "text",
+          "A web address, a path like C:\\Games\\game.exe, or start:Name to open a Start-menu app."]],
+  keys: [["keys", "Shortcut to press", "windows+d", "text", "Use + between keys: ctrl+shift+t, alt+tab, windows+shift+s."],
+         ["text", "Text to type", "{text}", "text", "Typed into whatever window is in front, after the shortcut."]],
+  http: [["method", "Method", "", "method"], ["url", "Address", "http://127.0.0.1:9000/robot/walk", "text", "Details in the address are made web-safe for you."],
+         ["body", "Data to send (JSON)", '{"direction": "{direction}", "steps": "{steps}"}', "json", 'A value of exactly "{steps}" keeps its type, so numbers stay numbers.'],
+         ["headers", "Headers (JSON)", '{"Authorization": "Bearer ..."}', "json", "Optional."]],
+  run: [["program", "Program", "C:\\Program Files\\App\\app.exe", "text"], ["args", "Arguments, one per line", "--open\n{file}", "lines", "Started directly, never through a command shell."],
+        ["cwd", "Start in folder", "", "text", "Optional."]],
+  powershell: [["script", "PowerShell script", "Get-Date -Format t", "script", "Details arrive as $env:GRAIN_name (for example $env:GRAIN_query), never pasted into the script, so they're safe."],
+               ["timeout", "Give up after (seconds)", "15", "number"]],
+};
+
+function renderActionFields() {
+  const a = editor.data.action;
+  $("actionFields").innerHTML = FIELDS[a.type].map(([key, label, hint, kind, help]) => {
+    let v = a[key];
+    if (kind === "lines" && Array.isArray(v)) v = v.join("\n");
+    if (kind === "json" && v !== undefined && typeof v !== "string") v = JSON.stringify(v, null, 2);
+    const input = kind === "method"
+      ? `<select data-field="${key}">${["POST", "GET", "PUT", "DELETE"].map((m) => `<option ${(v || "POST") === m ? "selected" : ""}>${m}</option>`).join("")}</select>`
+      : kind === "lines" || kind === "json" || kind === "script"
+        ? `<textarea data-field="${key}" data-kind="${kind}" placeholder="${esc(hint)}">${esc(v ?? "")}</textarea>`
+        : `<input type="${kind === "number" ? "number" : "text"}" data-field="${key}" data-kind="${kind}" placeholder="${esc(hint)}" value="${esc(v ?? "")}" ${kind === "text" ? 'class="mono"' : ""}>`;
+    return `<label class="f">${esc(label)}</label>${input}${help ? `<div class="faint small" style="margin-top:3px">${esc(help)}</div>` : ""}<div class="bad small" data-err="${key}"></div>`;
+  }).join("");
+  $("actionFields").querySelectorAll("[data-field]").forEach((el) => {
+    el.addEventListener("focus", () => { editor.lastField = el; });
+    el.addEventListener(el.tagName === "SELECT" ? "change" : "input", () => { readActionField(el); validate(); updateDirty(); syncParamsFromPhrases(); });
+  });
+  renderInserts();
+}
+
+function readActionField(el) {
+  const a = editor.data.action, key = el.dataset.field, kind = el.dataset.kind, raw = el.value;
+  el.classList.remove("invalid"); const err = $("actionFields").querySelector(`[data-err="${key}"]`); if (err) err.textContent = "";
+  if (!raw.trim()) { delete a[key]; return; }
+  if (kind === "lines") a[key] = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+  else if (kind === "number") a[key] = Number(raw);
+  else if (kind === "json") {
+    try { a[key] = JSON.parse(raw); } catch (e) { a[key] = raw; el.classList.add("invalid"); if (err) err.textContent = "This isn't valid JSON yet."; }
+  } else a[key] = raw;
+}
+
+function renderInserts() {
+  const el = $("inserts"); if (!el) return;
+  const names = Object.keys(editor.data.parameters);
+  el.innerHTML = names.length ? `<span class="faint">Insert a detail:</span>` + names.map((n) => `<button data-insert="${esc(n)}">{${esc(n)}}</button>`).join("") : "";
+  el.querySelectorAll("[data-insert]").forEach((b) => b.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    const field = editor.lastField && document.body.contains(editor.lastField) ? editor.lastField : $("actionFields").querySelector("input[type=text], textarea");
+    if (!field || field.tagName === "SELECT") return;
+    const text = `{${b.dataset.insert}}`, start = field.selectionStart ?? field.value.length, end = field.selectionEnd ?? start;
+    field.value = field.value.slice(0, start) + text + field.value.slice(end);
+    field.focus(); field.selectionStart = field.selectionEnd = start + text.length;
+    field.dispatchEvent(new Event("input"));
+  }));
+}
+
+function renderSafety() {
+  const d = editor.data, ro = editor.readOnly;
+  const fallback = ro ? "run" : defaultSafety(d.action);
+  const current = d.safety || fallback;
+  $("safetyCards").innerHTML = Object.entries(SAFETY).map(([k, [title, text]]) =>
+    `<button class="card${k === current ? " on" : ""}" data-safety="${k}" ${ro ? "disabled" : ""}><b>${title}${!d.safety && k === fallback && !ro ? ` <span class="faint" style="font-weight:400">(default)</span>` : ""}</b><span>${text}</span></button>`).join("");
+  if (ro) return;
+  $("safetyCards").querySelectorAll(".card").forEach((c) => c.addEventListener("click", () => {
+    d.safety = c.dataset.safety === fallback ? undefined : c.dataset.safety;
+    if (!d.safety) delete d.safety;
+    renderSafety(); updateDirty();
+  }));
+}
+
+function bindEditor() {
+  const d = editor.data;
+  $("e_name").addEventListener("input", (e) => {
+    const s = slug(e.target.value); if (s !== e.target.value) { const p = e.target.selectionStart; e.target.value = s; e.target.selectionStart = e.target.selectionEnd = Math.min(p, s.length); }
+    d.name = s; editor.nameTouched = true; validate(); updateDirty();
+  });
+  $("e_desc").addEventListener("input", (e) => {
+    d.description = e.target.value;
+    if (!editor.nameTouched) { d.name = slug(e.target.value.split(/[,.]/)[0].split(/\s+/).slice(0, 3).join(" ")); $("e_name").value = d.name; }
+    validate(); updateDirty();
+  });
+  const addPhrase = () => {
+    const v = $("newPhrase").value.trim(); if (!v) return;
+    d.phrases.push(v); $("newPhrase").value = ""; renderPhrases(); syncParamsFromPhrases(); validate(); updateDirty(); $("newPhrase").focus();
+  };
+  $("addPhrase").addEventListener("click", addPhrase);
+  $("newPhrase").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addPhrase(); } });
+  $("addParam").addEventListener("click", () => {
+    const name = slug(prompt("Name of the new detail (for example: query, room, steps)") || "");
+    if (!name) return;
+    if (d.parameters[name]) return toast(`There's already a detail called ${name}`, true);
+    d.parameters[name] = {type: "string", required: false}; renderParams(); validate(); updateDirty();
+  });
+  $("e_thrDefault").addEventListener("change", (e) => {
+    $("e_thr").disabled = e.target.checked;
+    if (e.target.checked) { delete d.threshold; $("e_thrVal").textContent = ""; }
+    else { d.threshold = Number($("e_thr").value); $("e_thrVal").textContent = Math.round(d.threshold * 100) + "%"; }
+    updateDirty();
+  });
+  $("e_thr").addEventListener("input", (e) => { d.threshold = Number(e.target.value); $("e_thrVal").textContent = Math.round(d.threshold * 100) + "%"; updateDirty(); });
+  $("e_keywords").addEventListener("input", (e) => { const v = e.target.value.split(",").map((x) => x.trim()).filter(Boolean); if (v.length) d.keywords = v; else delete d.keywords; updateDirty(); });
+  $("saveBtn").addEventListener("click", save);
+  if ($("deleteBtn")) $("deleteBtn").addEventListener("click", removeTool);
+  if ($("discardBtn")) $("discardBtn").addEventListener("click", () => { editor = null; renderWelcome(); });
+}
+
+function bindTest() {
+  const run = async () => {
+    const text = $("e_test").value.trim(); if (!text) return;
+    if (isDirty()) { const ok = await save(); if (!ok) return; }
+    $("e_testResult").innerHTML = '<span class="muted">Checking…</span>';
+    try {
+      const r = (await api("POST", "/v1/interpret", {text, execute: false, source: "editor"})).results[0];
+      const name = editor.data.name, mine = r.calls && r.calls.some((c) => c.name === name);
+      const how = r.matched === "phrase" ? "matched a phrase" : r.confidence != null ? `AI guessed, ${Math.round(r.confidence * 100)}% sure` : "";
+      $("e_testResult").innerHTML = mine
+        ? (r.outcome === "low_confidence"
+          ? `<span class="warn">⚠ The AI thought of this tool but wasn't sure enough (${how}), so it would skip it. Add a phrase like this to make it reliable.</span>`
+          : `<span class="ok">✓ Uses this tool</span> with ${esc(fmtArgs(r.calls.find((c) => c.name === name).arguments) || "no details")} <span class="faint">(${how})</span>`)
+        : r.calls && r.calls.length
+          ? `<span class="warn">→ Goes to a different tool: ${esc(fmtCalls(r.calls))}</span> <span class="faint">(${how})</span>`
+          : `<span class="bad">✕ Nothing would happen.</span> <span class="muted">Add a phrase that matches what you typed.</span>`;
+    } catch (e) { $("e_testResult").innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+  };
+  $("e_testBtn").addEventListener("click", run);
+  $("e_test").addEventListener("keydown", (e) => { if (e.key === "Enter") run(); });
+  if (!editor.readOnly) {
+    const first = editor.data.phrases.map(phraseText).find(Boolean);
+    if (first) $("e_test").placeholder = "e.g. " + first.replace(/\{(\w+)\}/g, (m, n) => ({query: "cat videos", text: "hello", direction: "forward", steps: "3"})[n] || "something");
+  }
+}
+
+function validate() {
+  if (!editor || editor.readOnly) return [];
+  const d = editor.data, problems = [];
+  if (!NAME_RE.test(d.name || "")) problems.push(["bad", "Give the tool a name (lowercase letters, numbers and _)."]);
+  else if (tools.some((t) => t.name === d.name && t.name !== editor.original)) problems.push(["bad", `There's already a tool called “${d.name}”.`]);
+  if (!d.description.trim()) problems.push(["bad", "Describe what the tool does: the AI uses this to choose it."]);
+  const params = Object.keys(d.parameters);
+  for (const p of d.phrases) {
+    const text = phraseText(p);
+    if (!text.replace(/\{\w+\}/g, "").trim()) problems.push(["bad", `The phrase “${text}” needs at least one real word.`]);
+  }
+  const a = d.action, used = placeholders(JSON.stringify(a));
+  for (const n of used) if (!params.includes(n)) problems.push(["bad", `The action uses {${n}}, but there's no detail with that name.`]);
+  const need = {open: "target", run: "program", powershell: "script", http: "url"}[a.type];
+  if (need && !a[need]) problems.push(["bad", `Fill in “${FIELDS[a.type].find((f) => f[0] === need)[1]}”.`]);
+  if (a.type === "keys" && !a.keys && !a.text) problems.push(["bad", "Enter a shortcut to press or text to type."]);
+  for (const k of ["body", "headers"]) if (typeof a[k] === "string") problems.push(["bad", `The ${k === "body" ? "data to send" : "headers"} isn't valid JSON yet.`]);
+  if (!d.phrases.length) problems.push(["warn", "No phrases: the AI will have to guess when to use this tool."]);
+  for (const n of params) if (!isUsed(n)) problems.push(["warn", `{${n}} isn't used by any phrase or by the action.`]);
+  $("checks").innerHTML = problems.length
+    ? problems.map(([lvl, m]) => `<div class="check ${lvl}">${lvl === "bad" ? "✕" : "⚠"} <span>${esc(m)}</span></div>`).join("")
+    : `<div class="check ok">✓ Ready to save</div>`;
+  const blocking = problems.some((p) => p[0] === "bad");
+  if ($("saveBtn")) $("saveBtn").disabled = blocking;
+  return problems;
+}
+
+function cleanData() {
+  const d = editor.data, out = {name: d.name, description: d.description.trim(), parameters: {}, action: {...d.action}};
+  if (d.phrases.length) out.phrases = d.phrases.map((p) => typeof p === "string" ? p.trim() : p).filter((p) => phraseText(p));
+  for (const [n, s] of Object.entries(d.parameters)) {
+    const spec = {type: s.type || "string"};
+    if (s.description) spec.description = s.description;
+    if (s.enum && s.enum.length) spec.enum = s.enum;
+    if (s.required === false) spec.required = false;
+    out.parameters[n] = spec;
+  }
+  if (d.safety) out.safety = d.safety;
+  if (d.threshold != null) out.threshold = d.threshold;
+  if (d.keywords && d.keywords.length) out.keywords = d.keywords;
+  return out;
+}
+
+function updateDirty() { if ($("dirtyFlag")) $("dirtyFlag").hidden = !isDirty(); }
+
+async function save() {
+  if (!editor || editor.readOnly) return false;
+  if (validate().some((p) => p[0] === "bad")) { toast("Fix the items marked ✕ first", true); return false; }
+  const data = cleanData();
+  try {
+    const result = await api("PUT", `/v1/tool_files/${encodeURIComponent(editor.original || data.name)}`, data);
+    if (result.errors && result.errors.length) toast("Saved, but: " + result.errors.join("; "), true); else toast(`Saved “${data.name}”`);
+    editor.original = data.name; editor.isNew = false; editor.snapshot = JSON.stringify(data); selected = data.name;
+    tools = (await api("GET", "/v1/tools")).tools; await loadStatus();
+    renderList();
+    const head = document.querySelector("#editorPanel h2"); if (head) head.textContent = data.name.replace(/_/g, " ");
+    if ($("discardBtn")) { const b = $("discardBtn"); b.outerHTML = `<button class="btn danger" id="deleteBtn">Delete tool</button>`; $("deleteBtn").addEventListener("click", removeTool); }
+    updateDirty(); validate();
+    return true;
+  } catch (e) { toast(e.message, true); return false; }
+}
+
+async function removeTool() {
+  if (!confirm(`Delete the tool “${editor.original}”? This removes its file.`)) return;
+  try {
+    await api("DELETE", `/v1/tool_files/${editor.original}`);
+    toast(`Deleted “${editor.original}”`); editor = null; selected = null; renderWelcome(); loadTools();
+  } catch (e) { toast(e.message, true); }
+}
+
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s" && currentTab === "tools" && editor && !editor.readOnly) { e.preventDefault(); save(); }
+});
+
+// ================================================================ TRY IT
+function resultCard(r) {
+  const [label, cls] = OUTCOME[r.outcome] || [r.outcome, ""];
+  const how = r.matched === "phrase" ? "matched a phrase" : r.confidence != null ? `AI ${Math.round(r.confidence * 100)}% sure` : "";
+  return `<div class="result"><div class="row"><b class="grow">“${esc(r.text || "")}”</b><span class="chip ${cls}">${label}</span></div>
+    <div style="margin-top:4px">${r.calls && r.calls.length ? `Would do: <b>${esc(fmtCalls(r.calls))}</b>` : `<span class="muted">No tool fits this.</span>`}
+    ${how ? `<span class="faint small"> · ${how}</span>` : ""}</div>
+    ${r.message && r.outcome !== "dry_run" && r.outcome !== "no_call" ? `<div class="muted small">${esc(r.message)}</div>` : ""}</div>`;
+}
+async function runTry(execute) {
+  const text = $("tryText").value.trim(); if (!text) return $("tryText").focus();
+  $("tryResults").innerHTML = '<p class="muted">Thinking…</p>';
+  try {
+    const body = {text, execute, source: "editor"};
+    if ($("tryProfile").value) body.profile = $("tryProfile").value;
+    const data = await api("POST", "/v1/interpret", body);
+    $("tryResults").innerHTML = data.results.map(resultCard).join("");
+    loadPending(); loadStatus();
+  } catch (e) { $("tryResults").innerHTML = `<p class="bad">${esc(e.message)}</p>`; }
+}
+$("tryPreview").addEventListener("click", () => runTry(false));
+$("tryRun").addEventListener("click", () => runTry(true));
+$("tryText").addEventListener("keydown", (e) => { if (e.key === "Enter") runTry(false); });
+
+async function loadTry() {
+  loadStatus();
+  const p = await api("GET", "/v1/profiles");
+  const chosen = $("tryProfile").value;
+  $("tryProfile").innerHTML = `<option value="">current profile (${esc(p.current)})</option>` + Object.keys(p.profiles).map((n) => `<option ${n === chosen ? "selected" : ""}>${esc(n)}</option>`).join("");
+  loadPending();
+  $("tryText").focus();
+}
+async function loadPending() {
+  const pending = (await api("GET", "/v1/pending")).pending;
+  $("pendingList").innerHTML = pending.length ? pending.map((item) => `<div class="result row">
+      <span class="grow"><b>“${esc(item.text)}”</b> → ${esc(fmtCalls(item.calls))} <span class="faint small">${Math.max(0, Math.round(item.expires - Date.now() / 1000))}s left</span></span>
+      <button class="btn sm primary" data-confirm="${item.id}">Confirm</button><button class="btn sm" data-cancel="${item.id}">Cancel</button></div>`).join("")
+    : `<div class="muted small">Nothing is waiting.</div>`;
+  $("pendingList").querySelectorAll("button").forEach((b) => b.addEventListener("click", async () => {
+    const id = b.dataset.confirm || b.dataset.cancel;
+    const data = await api("POST", `/v1/pending/${id}/${b.dataset.confirm ? "confirm" : "cancel"}`);
+    $("tryResults").innerHTML = data.results.map(resultCard).join(""); loadPending(); loadStatus();
+  }));
+}
+
+// ================================================================ HISTORY
+let historyEntries = [], histFilter = "review";
+const reviewable = (e) => e.correction == null && !["nothing_pending"].includes(e.outcome);
+document.querySelectorAll("#histFilters button").forEach((b) => b.addEventListener("click", () => {
+  histFilter = b.dataset.f; document.querySelectorAll("#histFilters button").forEach((x) => x.classList.toggle("on", x === b)); renderHistory();
+}));
+
+async function loadHistory() {
+  loadStatus();
+  if (!tools.length) tools = (await api("GET", "/v1/tools")).tools;
+  historyEntries = (await api("GET", "/v1/history?limit=300")).entries;
+  renderHistory();
+}
+
+function renderHistory() {
+  const toReview = historyEntries.filter(reviewable).length, done = historyEntries.length - toReview;
+  $("reviewCount").hidden = !toReview; $("reviewCount").textContent = toReview;
+  $("histStats").textContent = `${done} reviewed · ${toReview} to review`;
+  const list = historyEntries.filter((e) => histFilter === "all" || (histFilter === "review" ? reviewable(e) : !reviewable(e)));
+  $("histList").innerHTML = list.length ? list.map((e) => {
+    const [label, cls] = OUTCOME[e.outcome] || [e.outcome, ""];
+    const how = e.matched === "phrase" ? "phrase" : e.confidence != null ? `AI ${Math.round(e.confidence * 100)}% sure` : "";
+    let verdict = "";
+    if (e.correction != null) {
+      const right = JSON.stringify(e.correction) === JSON.stringify(e.calls);
+      verdict = right ? `<span class="chip ok">✓ You said this was right</span>`
+        : `<span class="chip warn">Should have done: ${esc(fmtCalls(e.correction))}</span>`;
+    }
+    return `<div class="hist" data-id="${e.id}">
+      <div><b>“${esc(e.text)}”</b><div class="faint small">${new Date(e.time * 1000).toLocaleString()} · ${esc(e.source)}${e.profile ? " · " + esc(e.profile) : ""}</div></div>
+      <div>${e.calls && e.calls.length ? esc(fmtCalls(e.calls)) : '<span class="muted">nothing</span>'}
+        <div class="row" style="margin-top:3px"><span class="chip ${cls}">${label}</span>${how ? `<span class="faint small">${how}</span>` : ""}</div>
+        ${verdict ? `<div style="margin-top:5px">${verdict}</div>` : ""}</div>
+      <div class="row" style="justify-content:flex-end">
+        <span class="small muted">Right?</span>
+        <button class="btn sm" data-act="right" title="${e.calls && e.calls.length ? "Yes, that's what I wanted" : "Yes, nothing should have happened"}">👍 Yes</button>
+        <button class="btn sm" data-act="fix" title="It should have done something else">👎 No…</button>
+      </div>
+      <div class="fix-slot" style="grid-column:1/-1"></div></div>`;
+  }).join("") : `<div class="empty">${histFilter === "review" ? "All caught up. Nothing to review." : "No commands yet. Say something to Grain, or use Try it."}</div>`;
+  $("histList").querySelectorAll(".hist").forEach((row) => {
+    const entry = historyEntries.find((x) => x.id === row.dataset.id);
+    row.querySelector('[data-act="right"]').addEventListener("click", () => correct(entry, entry.calls || []));
+    row.querySelector('[data-act="fix"]').addEventListener("click", () => openFix(row.querySelector(".fix-slot"), entry));
+  });
+}
+
+function openFix(slot, entry) {
+  if (slot.innerHTML) { slot.innerHTML = ""; return; }
+  const names = (entry.tools && entry.tools.length ? entry.tools : tools.map((t) => t.name)).filter((n) => tools.some((t) => t.name === n));
+  const first = (entry.calls && entry.calls[0]) || {};
+  slot.innerHTML = `<div class="fix"><b class="small">What should it have done?</b>
+    <div class="row" style="margin-top:8px"><select class="fx-tool" style="width:auto"><option value="">Nothing at all</option>${names.map((n) => `<option value="${esc(n)}" ${n === first.name ? "selected" : ""}>${esc(n.replace(/_/g, " "))}</option>`).join("")}</select></div>
+    <div class="fx-args"></div>
+    <div class="row" style="margin-top:10px"><button class="btn sm primary fx-save">Save answer</button><button class="btn sm ghost fx-cancel">Cancel</button></div></div>`;
+  const toolSel = slot.querySelector(".fx-tool");
+  const drawArgs = () => {
+    const tool = tools.find((t) => t.name === toolSel.value);
+    const params = tool ? toShort(tool.parameters) : {};
+    const preset = toolSel.value === first.name ? first.arguments || {} : {};
+    slot.querySelector(".fx-args").innerHTML = Object.entries(params).map(([n, s]) => {
+      const v = preset[n] ?? "";
+      const input = s.enum ? `<select data-arg="${esc(n)}"><option value="">(leave out)</option>${s.enum.map((o) => `<option ${String(v) === String(o) ? "selected" : ""}>${esc(o)}</option>`).join("")}</select>`
+        : s.type === "boolean" ? `<select data-arg="${esc(n)}" data-type="boolean"><option value="">(leave out)</option><option value="true" ${v === true ? "selected" : ""}>yes</option><option value="false" ${v === false ? "selected" : ""}>no</option></select>`
+        : `<input type="${s.type === "integer" || s.type === "number" ? "number" : "text"}" data-arg="${esc(n)}" data-type="${s.type}" value="${esc(v)}">`;
+      return `<label class="f">${esc(n)}${s.required === false ? " <span>· optional</span>" : ""}</label>${input}`;
+    }).join("");
+  };
+  toolSel.addEventListener("change", drawArgs); drawArgs();
+  slot.querySelector(".fx-cancel").addEventListener("click", () => { slot.innerHTML = ""; });
+  slot.querySelector(".fx-save").addEventListener("click", () => {
+    if (!toolSel.value) return correct(entry, []);
+    const args = {};
+    slot.querySelectorAll("[data-arg]").forEach((el) => {
+      if (el.value === "") return;
+      const t = el.dataset.type;
+      args[el.dataset.arg] = t === "integer" ? parseInt(el.value, 10) : t === "number" ? Number(el.value) : t === "boolean" ? el.value === "true" : el.value;
+    });
+    correct(entry, [{name: toolSel.value, arguments: args}]);
+  });
+}
+
+async function correct(entry, calls) {
+  try { await api("POST", `/v1/history/${entry.id}/correction`, {calls}); entry.correction = calls; toast("Thanks, noted"); renderHistory(); }
+  catch (e) { toast(e.message, true); }
+}
+
+$("downloadTraining").addEventListener("click", async () => {
+  const response = await fetch("/v1/training_data", {headers: {"Authorization": "Bearer " + token}});
+  const text = await response.text();
+  if (!text.trim()) return toast("Review a few commands first: answered ones become training data.", true);
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([text], {type: "application/x-ndjson"}));
+  link.download = "grain-training.jsonl"; link.click();
+  toast(`Downloaded ${text.trim().split("\n").length} examples`);
+});
+
+// ================================================================ PROFILES
+let profileState = null;
+const globMatch = (pattern, name) => new RegExp("^" + pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".") + "$").test(name);
+
+async function loadProfiles() {
+  loadStatus();
+  tools = (await api("GET", "/v1/tools")).tools;
+  const p = await api("GET", "/v1/profiles");
+  profileState = {
+    active: p.active_profile, current: p.current,
+    profiles: Object.entries(p.profiles).map(([name, patterns]) => ({
+      name, all: patterns.includes("*"),
+      picked: new Set(tools.filter((t) => patterns.some((pat) => pat === t.name)).map((t) => t.name)),
+      extra: patterns.filter((pat) => pat !== "*" && /[*?]/.test(pat)),
+    })),
+    rules: p.profile_rules.map((r) => ({...r})),
+  };
+  profileState.snapshot = JSON.stringify(profilesPayload());
+  renderProfiles();
+}
+
+function profilesPayload() {
+  const profiles = {};
+  for (const pr of profileState.profiles) {
+    if (!pr.name.trim()) continue;
+    profiles[pr.name.trim()] = pr.all ? ["*"] : [...pr.picked, ...pr.extra];
+  }
+  return {profiles, profile_rules: profileState.rules.filter((r) => r.process.trim()), active_profile: profileState.active};
+}
+function profilesChanged() { $("profilesDirty").hidden = JSON.stringify(profilesPayload()) === profileState.snapshot; }
+
+function countFor(pr) { return pr.all ? tools.length : tools.filter((t) => pr.picked.has(t.name) || pr.extra.some((x) => globMatch(x, t.name))).length; }
+
+function renderProfiles() {
+  const s = profileState, names = s.profiles.map((p) => p.name).filter(Boolean);
+  $("activeProfile").innerHTML = `<option value="auto" ${s.active === "auto" ? "selected" : ""}>Automatic (switch by app)</option>`
+    + names.map((n) => `<option value="${esc(n)}" ${s.active === n ? "selected" : ""}>Always “${esc(n)}”</option>`).join("");
+  $("currentProfile").textContent = `In use right now: ${s.current}`;
+  $("profileCards").innerHTML = s.profiles.map((pr, i) => {
+    const n = countFor(pr);
+    const groups = ["file", "plugin", "remote", "builtin"].map((src) => {
+      const g = tools.filter((t) => t.source === src);
+      return g.length ? `<div class="group-title" style="margin:10px 0 0">${SOURCE_LABEL[src]}</div><div class="tool-grid">${g.map((t) => `<label><input type="checkbox" data-pick="${esc(t.name)}" ${pr.all || pr.picked.has(t.name) ? "checked" : ""} ${pr.all ? "disabled" : ""}>${esc(t.name.replace(/_/g, " "))}</label>`).join("")}</div>` : "";
+    }).join("");
+    return `<div class="panel" data-i="${i}" style="margin-top:14px">
+      <div class="row"><input type="text" class="pr-name" value="${esc(pr.name)}" placeholder="Profile name, e.g. gaming" style="max-width:260px;font-weight:600">
+        <span class="chip ${n > 10 ? "warn" : ""}">${n} tools${n > 10 ? " · may hurt accuracy" : ""}</span><span class="grow"></span>
+        <label class="switch"><input type="checkbox" class="pr-all" ${pr.all ? "checked" : ""}> All tools</label>
+        ${s.profiles.length > 1 ? `<button class="icon-btn pr-del" title="Delete profile">✕</button>` : ""}</div>
+      ${groups}
+      ${pr.extra.length ? `<p class="faint small" style="margin:8px 0 0">Also includes tools matching: ${pr.extra.map(esc).join(", ")}</p>` : ""}</div>`;
+  }).join("");
+  $("profileCards").querySelectorAll(".panel").forEach((card) => {
+    const pr = s.profiles[card.dataset.i];
+    card.querySelector(".pr-name").addEventListener("input", (e) => { pr.name = e.target.value; profilesChanged(); });
+    card.querySelector(".pr-name").addEventListener("change", renderProfiles);
+    card.querySelector(".pr-all").addEventListener("change", (e) => { pr.all = e.target.checked; if (!pr.all && !pr.picked.size) tools.forEach((t) => pr.picked.add(t.name)); renderProfiles(); profilesChanged(); });
+    card.querySelectorAll("[data-pick]").forEach((cb) => cb.addEventListener("change", () => {
+      if (cb.checked) pr.picked.add(cb.dataset.pick); else pr.picked.delete(cb.dataset.pick);
+      const chip = card.querySelector(".chip"), n = countFor(pr); chip.textContent = `${n} tools${n > 10 ? " · may hurt accuracy" : ""}`; chip.className = "chip" + (n > 10 ? " warn" : "");
+      profilesChanged();
+    }));
+    const del = card.querySelector(".pr-del");
+    if (del) del.addEventListener("click", () => { if (confirm(`Delete the profile “${pr.name}”?`)) { s.profiles.splice(card.dataset.i, 1); renderProfiles(); profilesChanged(); } });
+  });
+  $("ruleRows").innerHTML = s.rules.length ? s.rules.map((r, i) => `<div class="kv-row" data-i="${i}">
+      <span class="small muted">When</span><input type="text" class="ru-proc mono" value="${esc(r.process)}" placeholder="Code.exe" style="max-width:200px">
+      <span class="small muted">is in front, use</span><select class="ru-prof" style="max-width:200px">${names.map((n) => `<option ${n === r.profile ? "selected" : ""}>${esc(n)}</option>`).join("")}</select>
+      <button class="icon-btn ru-del" title="Remove">✕</button></div>`).join("") : `<div class="muted small" style="margin-bottom:8px">No rules yet.</div>`;
+  $("ruleRows").querySelectorAll(".kv-row").forEach((row) => {
+    const r = s.rules[row.dataset.i];
+    row.querySelector(".ru-proc").addEventListener("input", (e) => { r.process = e.target.value; profilesChanged(); });
+    row.querySelector(".ru-prof").addEventListener("change", (e) => { r.profile = e.target.value; profilesChanged(); });
+    row.querySelector(".ru-del").addEventListener("click", () => { s.rules.splice(row.dataset.i, 1); renderProfiles(); profilesChanged(); });
+  });
+  profilesChanged();
+}
+$("activeProfile").addEventListener("change", (e) => { profileState.active = e.target.value; profilesChanged(); });
+$("addProfile").addEventListener("click", () => { profileState.profiles.push({name: "", all: false, picked: new Set(), extra: []}); renderProfiles(); profilesChanged(); });
+$("addRule").addEventListener("click", () => { profileState.rules.push({process: "", profile: profileState.profiles[0].name}); renderProfiles(); profilesChanged(); });
+$("saveProfiles").addEventListener("click", async () => {
+  const payload = profilesPayload();
+  if (!Object.keys(payload.profiles).length) return toast("Keep at least one profile", true);
+  try { await api("PUT", "/v1/profiles", payload); toast("Profiles saved"); loadProfiles(); }
+  catch (e) { toast(e.message, true); }
+});
+
+// ================================================================ SETTINGS
+let settingsSnapshot = "", micList = [];
+
+function keyName(e) {
+  const k = e.key;
+  if (k === " ") return "space";
+  if (/^F\d{1,2}$/.test(k)) return k.toLowerCase();
+  if (k.length === 1) return k.toLowerCase();
+  return ({Escape: "esc", Enter: "enter", Tab: "tab", Backspace: "backspace", Delete: "delete", Insert: "insert", Home: "home",
+           End: "end", PageUp: "page up", PageDown: "page down", ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left",
+           ArrowRight: "right", Pause: "pause", ScrollLock: "scroll lock"})[k] || null;
+}
+
+// Click, then press the keys together: produces names Grain's hotkey library understands.
+function recordHotkey(input, button, onDone) {
+  const before = input.value;
+  input.value = "Press the keys…"; input.classList.add("recording"); button.disabled = true;
+  const finish = (value) => {
+    document.removeEventListener("keydown", onKey, true);
+    input.classList.remove("recording"); button.disabled = false;
+    input.value = value; if (value !== before) onDone(value);
+  };
+  const onKey = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if (["Control", "Alt", "Shift", "Meta", "OS"].includes(e.key)) return;  // wait for the main key
+    if (e.key === "Escape" && !e.ctrlKey && !e.altKey) return finish(before);
+    const key = keyName(e);
+    const mods = [e.ctrlKey && "ctrl", e.altKey && "alt", e.shiftKey && "shift", e.metaKey && "windows"].filter(Boolean);
+    if (!key || !mods.length) { toast("Hold Ctrl, Alt, Shift or Windows with another key", true); return finish(before); }
+    finish([...mods, key].join("+"));
+  };
+  document.addEventListener("keydown", onKey, true);
+}
+
+function micOptions(selected) {
+  return `<option value="">Windows default microphone</option>` + micList.map((m) => `<option ${m === selected ? "selected" : ""}>${esc(m)}</option>`).join("");
+}
+
+function settingsForm() {
+  return {
+    hotkey: $("s_hotkey").value, wake_word_mode: $("s_wake").checked,
+    wake_words: $("s_wakeWords").value.split(",").map((w) => w.trim()).filter(Boolean),
+    silence_seconds: Number($("s_silence").value), max_seconds: Number($("s_max").value),
+    input_device: $("s_mic").value || null, confidence_threshold: Number($("s_conf").value),
+    confirm_seconds: Number($("s_confirm").value), needle_weights: $("s_model").value.trim(),
+    start_with_windows: $("s_startup").checked, check_for_updates: $("s_updates").checked,
+    update_url: $("s_updateUrl").value.trim(), api_port: Number($("s_port").value),
+  };
+}
+function settingsDirty() { $("s_dirty").hidden = JSON.stringify(settingsForm()) === settingsSnapshot; }
+
+async function loadSettings() {
+  await loadStatus();
+  const data = await api("GET", "/v1/settings"), s = data.settings;
+  micList = data.microphones || [];
+  $("s_hotkey").value = s.hotkey; $("s_wake").checked = s.wake_word_mode; $("s_wakeWords").value = (s.wake_words || []).join(", ");
+  $("s_silence").value = s.silence_seconds; $("s_max").value = s.max_seconds;
+  $("s_mic").innerHTML = micOptions(s.input_device);
+  $("s_conf").value = s.confidence_threshold; $("s_confirm").value = s.confirm_seconds; $("s_model").value = s.needle_weights || "";
+  $("s_startup").checked = s.start_with_windows; $("s_updates").checked = s.check_for_updates; $("s_updateUrl").value = s.update_url || "";
+  $("s_port").value = s.api_port;
+  $("s_version").textContent = `Grain ${data.version}` + (data.microphone_in_use ? ` · listening on ${data.microphone_in_use}` : "");
+  $("s_silenceVal").textContent = `${Number(s.silence_seconds).toFixed(1)} s`;
+  $("s_confVal").textContent = `${Math.round(s.confidence_threshold * 100)}%`;
+  settingsSnapshot = JSON.stringify(settingsForm()); settingsDirty();
+  $("k_new").hidden = true;  // a new key is shown once, right after it's made
+  await loadKeys();
+}
+
+const when = (t) => t ? new Date(t * 1000).toLocaleString() : "never";
+async function loadKeys() {
+  const list = (await api("GET", "/v1/keys")).keys;
+  $("k_list").innerHTML = list.length
+    ? `<tr><th>Program</th><th>Made</th><th>Last used</th><th></th></tr>` + list.map((k) =>
+        `<tr><td><code>${esc(k.client)}</code></td><td>${esc(when(k.created))}</td><td>${esc(when(k.last_used))}</td>` +
+        `<td><button class="btn sm" data-revoke="${esc(k.id)}">Revoke</button></td></tr>`).join("")
+    : `<tr><td class="muted">No program keys yet.</td></tr>`;
+  $("k_list").querySelectorAll("[data-revoke]").forEach((b) => b.addEventListener("click", async () => {
+    if (!confirm("Revoke this key? The program stops working at once, and its tools are removed.")) return;
+    try { await api("DELETE", `/v1/keys/${b.dataset.revoke}`); toast("Key revoked"); await loadKeys(); } catch (e) { toast(e.message, true); }
+  }));
+}
+$("k_make").addEventListener("click", async () => {
+  try {
+    const r = await api("POST", "/v1/keys", {client: $("k_client").value.trim()});
+    $("k_new").hidden = false;
+    $("k_new").innerHTML = `Key for <code>${esc(r.client)}</code>, shown only now: <code>${esc(r.key)}</code> <button class="btn sm" id="k_copy">Copy</button>` +
+      `<div class="small muted">Give it to the program, for example as its GRAIN_API_KEY environment variable.</div>`;
+    $("k_copy").addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(r.key); toast("Key copied"); } catch (e) { toast("Couldn't copy. Select it and copy it by hand.", true); }
+    });
+    $("k_client").value = "";
+    await loadKeys();
+  } catch (e) { toast(e.message, true); }
+});
+
+document.querySelectorAll("#settings input, #settings select").forEach((el) => el.addEventListener(el.type === "range" || el.type === "text" || el.type === "number" ? "input" : "change", () => {
+  $("s_silenceVal").textContent = `${Number($("s_silence").value).toFixed(1)} s`;
+  $("s_confVal").textContent = `${Math.round(Number($("s_conf").value) * 100)}%`;
+  settingsDirty();
+}));
+$("s_hotkeyRecord").addEventListener("click", () => recordHotkey($("s_hotkey"), $("s_hotkeyRecord"), settingsDirty));
+
+async function testMic(select, resultEl, meterEl) {
+  resultEl.textContent = "Listening for 3 seconds: say something…"; meterEl.style.width = "0";
+  try {
+    const r = await api("POST", "/v1/settings/test_microphone", {device: select.value || null});
+    meterEl.style.width = `${Math.max(3, Math.round(r.level * 100))}%`;
+    meterEl.style.background = r.ok ? "var(--ok)" : "var(--warn)";
+    resultEl.innerHTML = `<b class="${r.ok ? "ok" : "warn"}">${esc(r.verdict)}</b> <span class="faint">(${esc(r.device)})</span>`;
+    return r;
+  } catch (e) { resultEl.innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+}
+$("s_micTest").addEventListener("click", () => testMic($("s_mic"), $("s_micResult"), $("s_micMeter")));
+
+$("s_save").addEventListener("click", async () => {
+  try {
+    const result = await api("PUT", "/v1/settings", settingsForm());
+    toast(result.restart_needed.length ? "Saved. Restart Grain for the new API port to take effect." : "Settings saved and applied");
+    await loadSettings();
+  } catch (e) { toast(e.message, true); }
+});
+$("s_checkNow").addEventListener("click", async () => {
+  $("s_updateResult").textContent = "Checking…";
+  try {
+    if (JSON.stringify(settingsForm()) !== settingsSnapshot) await api("PUT", "/v1/settings", settingsForm());
+    const r = await api("POST", "/v1/updates/check");
+    $("s_updateResult").innerHTML = esc(r.message) + (r.available && r.url ? ` <a href="${esc(r.url)}" target="_blank" rel="noopener">Download</a>` : "");
+  } catch (e) { $("s_updateResult").innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+});
+$("s_newKey").addEventListener("click", async () => {
+  if (!confirm("Make a new tool editor key? Other open tool editor pages will need reopening from the tray. Program keys keep working.")) return;
+  try {
+    const r = await api("POST", "/v1/settings/regenerate_token");
+    token = r.api_token; try { sessionStorage.setItem("grainToken", token); } catch (e) {}
+    toast("New tool editor key made. This page has it already.");
+  } catch (e) { toast(e.message, true); }
+});
+document.querySelectorAll("[data-open]").forEach((b) => b.addEventListener("click", () => api("POST", `/v1/open/${b.dataset.open}`).catch((e) => toast(e.message, true))));
+$("s_rerunSetup").addEventListener("click", () => openSetup());
+
+// ================================================================ FIRST-RUN SETUP
+const wizard = {step: 0, mic: "", hotkey: "ctrl+alt+space", wake: false, startup: false, micResult: null};
+const WIZARD = [
+  () => `<h2 style="font-size:19px">Welcome to Grain</h2>
+    <p class="sub" style="font-size:14px">Grain is a voice assistant that runs entirely on this PC. Your voice is turned into text here, and a small AI picks what to do here. Nothing you say leaves your computer.</p>
+    <p>This takes about a minute: pick a microphone, choose how to talk to Grain, and you're done.</p>`,
+  () => `<h2>Your microphone</h2><p class="sub">Pick the one you'll talk into, then press Test and say something.</p>
+    <div class="row" style="margin-top:12px"><select id="w_mic" class="grow">${micOptions(wizard.mic)}</select><button class="btn" id="w_test">Test</button></div>
+    <div class="meter"><i id="w_meter"></i></div><p class="small" id="w_result">${wizard.micResult ? esc(wizard.micResult) : "&nbsp;"}</p>`,
+  () => `<h2>How to talk to Grain</h2>
+    <p class="sub">Press your hotkey, then speak. Grain stops listening when you pause.</p>
+    <div class="row" style="margin-top:12px"><input type="text" id="w_hotkey" class="keycap grow" readonly value="${esc(wizard.hotkey)}"><button class="btn" id="w_record">Change…</button></div>
+    <label class="switch" style="margin-top:14px"><input type="checkbox" id="w_wake" ${wizard.wake ? "checked" : ""}> Also listen all the time for “needle” (uses more CPU)</label>`,
+  () => `<h2>Start with Windows?</h2><p class="sub">Grain sits in the system tray, by the clock. It can start automatically when you sign in.</p>
+    <label class="switch" style="margin-top:12px"><input type="checkbox" id="w_startup" ${wizard.startup ? "checked" : ""}> Start Grain when I sign in</label>`,
+  () => `<h2>You're set</h2><p class="sub">Press <b class="keycap">${esc(wizard.hotkey)}</b> and try:</p>
+    <ul><li>“open notepad”</li><li>“what time is it”</li><li>“search YouTube for cat videos”</li><li>“set a timer for five minutes”</li></ul>
+    <p class="small muted">Everything else, including making your own commands, is in this page's Tools and Guide tabs. You can reopen this tool editor any time from the Grain tray icon.</p>`,
+];
+
+function renderWizard() {
+  $("wizSteps").innerHTML = WIZARD.map((_, i) => `<i class="${i <= wizard.step ? "on" : ""}"></i>`).join("");
+  $("wizBody").innerHTML = WIZARD[wizard.step]();
+  $("wizBack").hidden = wizard.step === 0;
+  $("wizNext").textContent = wizard.step === WIZARD.length - 1 ? "Finish" : "Next";
+  if ($("w_mic")) {
+    $("w_mic").addEventListener("change", (e) => { wizard.mic = e.target.value; });
+    $("w_test").addEventListener("click", async () => { const r = await testMic($("w_mic"), $("w_result"), $("w_meter")); if (r) wizard.micResult = r.verdict; });
+  }
+  if ($("w_record")) $("w_record").addEventListener("click", () => recordHotkey($("w_hotkey"), $("w_record"), (v) => { wizard.hotkey = v; }));
+  if ($("w_wake")) $("w_wake").addEventListener("change", (e) => { wizard.wake = e.target.checked; });
+  if ($("w_startup")) $("w_startup").addEventListener("change", (e) => { wizard.startup = e.target.checked; });
+}
+
+async function openSetup() {
+  try {
+    const data = await api("GET", "/v1/settings");
+    micList = data.microphones || [];
+    Object.assign(wizard, {step: 0, mic: data.settings.input_device || "", hotkey: data.settings.hotkey,
+                           wake: data.settings.wake_word_mode, startup: data.settings.start_with_windows, micResult: null});
+  } catch (e) { return toast(e.message, true); }
+  renderWizard();
+  if (!$("setupDialog").open) $("setupDialog").showModal();
+}
+
+async function finishSetup(save) {
+  try {
+    if (save) await api("PUT", "/v1/settings", {input_device: wizard.mic || null, hotkey: wizard.hotkey, wake_word_mode: wizard.wake,
+                                                start_with_windows: wizard.startup});
+    await api("POST", "/v1/setup/done");
+    $("setupDialog").close(); loadStatus();
+    toast(save ? "All set. Grain is listening." : "Setup skipped. It's under Settings if you want it later.");
+  } catch (e) { toast(e.message, true); }
+}
+$("wizNext").addEventListener("click", () => { if (wizard.step === WIZARD.length - 1) finishSetup(true); else { wizard.step++; renderWizard(); } });
+$("wizBack").addEventListener("click", () => { wizard.step = Math.max(0, wizard.step - 1); renderWizard(); });
+$("wizSkip").addEventListener("click", () => finishSetup(false));
+$("setupDialog").addEventListener("cancel", (e) => e.preventDefault());  // Esc doesn't silently skip setup
+
+// ================================================================ GUIDE
+const guideTemplate = $("doc").innerHTML;
+let tokenShown = false;
+async function loadGuide() {
+  await loadStatus();
+  const s = status, wakes = s.wake_words || ["needle"];
+  const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1);
+  const values = {
+    PORT: s.api_port || 8765, MODEL: s.model || "needle3.cact",
+    HOTKEY: (s.hotkey || "ctrl+alt+space").split("+").map(cap).join("+"),
+    WAKE: wakes.map((w) => `“${w}”`).join(" or "), WAKE1: cap(wakes[0]),
+    THRESHOLD: Math.round((s.confidence_threshold ?? 0.5) * 100), THRESHOLD_RAW: s.confidence_threshold ?? 0.5, CONFIRM: s.confirm_seconds ?? 30,
+  };
+  $("doc").innerHTML = guideTemplate.replace(/__([A-Z0-9_]+?)__/g, (m, k) => k in values ? esc(values[k]) : m);
+
+  $("toc").innerHTML = [...$("doc").querySelectorAll("section.g")].map((sec) => `<a href="#${sec.id}" data-sec="${sec.id}">${esc(sec.dataset.title)}</a>`).join("");
+  $("toc").querySelectorAll("a").forEach((a) => a.addEventListener("click", (e) => {
+    e.preventDefault(); $(a.dataset.sec).scrollIntoView({behavior: "smooth", block: "start"});
+  }));
+  $("doc").querySelectorAll('a[href^="#g-"]').forEach((a) => a.addEventListener("click", (e) => {
+    e.preventDefault(); $(a.getAttribute("href").slice(1)).scrollIntoView({behavior: "smooth", block: "start"});
+  }));
+  $("doc").querySelectorAll("[data-goto]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); switchTab(a.dataset.goto); }));
+
+  $("doc").querySelectorAll(".code").forEach((block) => {
+    const button = document.createElement("button");
+    button.className = "btn sm copy"; button.textContent = "Copy";
+    button.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(block.querySelector("pre").innerText); button.textContent = "Copied"; }
+      catch (e) { button.textContent = "Select and copy"; }
+      setTimeout(() => { button.textContent = "Copy"; }, 1600);
+    });
+    block.appendChild(button);
+  });
+
+  tokenShown = false;
+  $("tokenShow").addEventListener("click", () => {
+    tokenShown = !tokenShown;
+    $("tokenView").textContent = tokenShown ? token : "••••••••••••";
+    $("tokenShow").textContent = tokenShown ? "Hide" : "Show";
+  });
+  $("tokenCopy").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(token); toast("Access key copied"); } catch (e) { toast("Couldn't copy. Use Show and copy it by hand.", true); }
+  });
+  watchToc();
+}
+
+let tocObserver;
+function watchToc() {
+  if (tocObserver) tocObserver.disconnect();
+  tocObserver = new IntersectionObserver((entries) => {
+    const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+    if (!visible) return;
+    $("toc").querySelectorAll("a").forEach((a) => a.classList.toggle("on", a.dataset.sec === visible.target.id));
+  }, {rootMargin: "-80px 0px -60% 0px"});
+  $("doc").querySelectorAll("section.g").forEach((sec) => tocObserver.observe(sec));
+}
+
+// ================================================================ live updates
+async function watchEvents() {
+  let seq = 0;
+  try { seq = (await api("GET", "/v1/events")).seq; } catch (e) { return; }
+  for (;;) {
+    try {
+      const data = await api("GET", `/v1/events?after=${seq}&timeout=25`);
+      seq = data.seq;
+      if (data.events.length) {
+        loadStatus();
+        if (currentTab === "history") { historyEntries = (await api("GET", "/v1/history?limit=300")).entries; renderHistory(); }
+        else api("GET", "/v1/history?limit=300").then((h) => { historyEntries = h.entries; const n = historyEntries.filter(reviewable).length; $("reviewCount").hidden = !n; $("reviewCount").textContent = n; });
+        if (currentTab === "try") loadPending();
+      }
+    } catch (e) { await new Promise((r) => setTimeout(r, 5000)); }
+  }
+}
+
+if (!token) $("authError").hidden = false;
+else {
+  const startTab = START_TAB;
+  loadTools().then(() => {
+    if (startTab === "setup" || status.setup_done === false) openSetup();
+    else if (startTab && startTab !== "tools" && document.getElementById(startTab)) switchTab(startTab);
+  }).catch((e) => toast(e.message, true));
+  api("GET", "/v1/history?limit=300").then((h) => { historyEntries = h.entries; const n = historyEntries.filter(reviewable).length; $("reviewCount").hidden = !n; $("reviewCount").textContent = n; }).catch(() => {});
+  watchEvents();
+}
+</script>
+</body>
+</html>
