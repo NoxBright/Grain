@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+dist/
+build/
+
+# Model weights: linked from the installed app, not source (see README "Running on Linux")
+models/*.cact

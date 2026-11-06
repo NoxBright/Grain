@@ -1,7 +1,7 @@
-"""The built-in tools: general Windows commands only. Everything else lives in plugins\\ or tools\\."""
-import ctypes
+"""The built-in tools: general system commands only. Everything else lives in plugins\\ or tools\\."""
 import datetime
 
+from . import platform
 from .launch import open_target
 from .registry import Tool
 
@@ -10,9 +10,8 @@ VK = {"volume_up": 0xAF, "volume_down": 0xAE, "mute": 0xAD,
 
 
 def press_key(vk, times=1):
-    for _ in range(times):
-        ctypes.windll.user32.keybd_event(vk, 0, 0, 0)
-        ctypes.windll.user32.keybd_event(vk, 0, 2, 0)  # KEYEVENTF_KEYUP
+    """Send one media key. Kept as a name of its own so tests can intercept every press."""
+    platform.press_key(vk, times)
 
 
 def builtin_tools(config, notify):
@@ -42,8 +41,12 @@ def builtin_tools(config, notify):
         return datetime.datetime.now().strftime("It's %I:%M %p, %A %d %B")
 
     def lock_computer():
-        ctypes.windll.user32.LockWorkStation()
+        platform.lock_workstation()
         return "locked"
+
+    def battery_level():
+        percent = platform.battery_percent()
+        return "No battery found" if percent is None else f"Battery at {percent}%"
 
     def obj(properties, required=()):
         return {"type": "object", "properties": properties, "required": list(required)}
@@ -80,4 +83,7 @@ def builtin_tools(config, notify):
              phrases=["what time is it", "what's the time", "time", "what's the date", "what day is it"]),
         Tool("lock_computer", "Lock the computer screen.", obj({}), lock_computer, threshold=0.7,
              phrases=["lock the computer", "lock my computer", "lock computer", "lock the screen"]),
+        Tool("battery_level", "Report the battery charge of this computer.", obj({}), battery_level,
+             phrases=["battery", "battery level", "what's my battery", "what is my battery level"],
+             keywords=["battery", "charge", "power", "laptop"]),
     ]

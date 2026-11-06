@@ -1,10 +1,12 @@
 """Paths and settings.
 
 Grain's own files (the app, models, default tools) live in the install folder and are never
-written to. Everything that changes lives in the user's data folder, %APPDATA%\\Grain:
-settings, history, notes, the log, and the user's tools, plugins and fine-tuned models.
+written to. Everything that changes lives in the user's data folder: settings, history, notes,
+the log, and the user's tools, plugins and fine-tuned models. That folder is %APPDATA%\\Grain
+on Windows and $XDG_DATA_HOME/Grain (default ~/.local/share/Grain) on Linux.
 """
 import json
+import logging
 import os
 import secrets
 import shutil
@@ -13,12 +15,26 @@ import threading
 
 from . import __version__
 
+log = logging.getLogger("grain")
+
 FROZEN = getattr(sys, "frozen", False)  # running as Grain App.exe
 APP_DIR = os.path.dirname(sys.executable) if FROZEN else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUNDLE = getattr(sys, "_MEIPASS", APP_DIR)  # bundled assets (UI, icon) unpack here inside the exe
 APP_NAME = "Grain App"
 
-DATA_DIR = os.environ.get("GRAIN_DATA_DIR") or os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "Grain")
+
+def default_data_dir():
+    """Where Grain keeps what changes about a user's setup, unless GRAIN_DATA_DIR says otherwise."""
+    override = os.environ.get("GRAIN_DATA_DIR")
+    if override:
+        return override
+    if os.environ.get("APPDATA"):  # Windows
+        return os.path.join(os.environ["APPDATA"], "Grain")
+    data_home = os.environ.get("XDG_DATA_HOME") or os.path.join(os.path.expanduser("~"), ".local", "share")
+    return os.path.join(data_home, "Grain")
+
+
+DATA_DIR = default_data_dir()
 CONFIG_PATH = os.path.join(DATA_DIR, "settings.json")
 LOG_PATH = os.path.join(DATA_DIR, "grain.log")
 NOTES_PATH = os.path.join(DATA_DIR, "notes.md")
@@ -43,7 +59,7 @@ DEFAULT_CONFIG = {
     "hotkey": "ctrl+alt+space",
     "wake_word_mode": False,
     "wake_words": ["needle", "hey needle"],
-    "needle_weights": "models\\needle3.cact",  # a fine-tuned .cact in the data folder's models\ works too
+    "needle_weights": os.path.join("models", "needle3.cact"),  # a fine-tuned .cact in the data folder's models works too
     "confidence_threshold": 0.5,
     "tool_thresholds": {"lock_computer": 0.7},  # overrides a tool's own threshold
     "confirm_seconds": 30,  # how long a "confirm" tool waits for a yes
@@ -158,13 +174,22 @@ def _migrate_legacy_folder():
 
 
 def _install_defaults(config):
-    """Copy default tools and plugins the user has never had. Ones they deleted stay deleted."""
+    """Copy default tools and plugins the user has never had. Ones they deleted stay deleted,
+    and ones Grain no longer ships are retired: a default replaced by a built-in tool would
+    otherwise linger in the data folder and clash with it on every start."""
     installed = set(config.get("installed_defaults", []))
     for folder, suffix in (("tools", ".json"), ("plugins", ".py")):
         source_dir, target_dir = os.path.join(DEFAULTS_DIR, folder), os.path.join(DATA_DIR, folder)
-        os.makedirs(target_dir, exist_ok=True)
         if not os.path.isdir(source_dir) or os.path.abspath(source_dir) == os.path.abspath(target_dir):
             continue
+        shipped = {f"{folder}/{name}" for name in os.listdir(source_dir) if name.endswith(suffix)}
+        for key in sorted(installed & _retired(folder, installed, shipped)):
+            installed.discard(key)
+            target = os.path.join(DATA_DIR, key.replace("/", os.sep))
+            if os.path.exists(target):
+                log.info("retiring default %s: Grain ships it no longer", key)
+                os.remove(target)
+        os.makedirs(target_dir, exist_ok=True)
         for name in sorted(os.listdir(source_dir)):
             key = f"{folder}/{name}"
             if not name.endswith(suffix) or key in installed:
@@ -174,6 +199,12 @@ def _install_defaults(config):
                 shutil.copy2(os.path.join(source_dir, name), target)
             installed.add(key)
     config["installed_defaults"] = sorted(installed)
+
+
+def _retired(folder, installed, shipped):
+    """Installed defaults of this folder that are no longer shipped."""
+    return {key for key in installed
+            if key.startswith(folder + "/") and key not in shipped}
 
 
 def load_config():

@@ -4,10 +4,11 @@ import logging
 import logging.handlers
 import os
 import sys
+import tempfile
 import threading
 import webbrowser
 
-from . import __version__, filetools, plugins, settings
+from . import __version__, filetools, platform, plugins, settings
 from .api import serve
 from .audio import Microphone, capture_utterance, input_names, rescan_devices
 from .builtin import builtin_tools
@@ -176,7 +177,7 @@ class TrayApp:
                 open(path, "a", encoding="utf-8").close()
             else:
                 os.makedirs(path, exist_ok=True)
-        os.startfile(path)
+        platform.open_path(path)
 
     def toggle_wake(self):
         self.config["wake_word_mode"] = not self.config["wake_word_mode"]
@@ -374,11 +375,10 @@ _instance_mutex = None  # held for the life of the process
 
 
 def claim_single_instance():
-    """True if this is the only Grain running for this Windows user."""
-    import ctypes
+    """True if this is the only Grain running for this user."""
     global _instance_mutex
-    _instance_mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "Local\\GrainApp-SingleInstance")
-    return ctypes.windll.kernel32.GetLastError() != 183  # ERROR_ALREADY_EXISTS
+    _instance_mutex = platform.claim_single_instance()
+    return _instance_mutex
 
 
 def editor_url(config, section=""):
@@ -386,13 +386,13 @@ def editor_url(config, section=""):
 
 
 class PrivateFormatter(logging.Formatter):
-    """Keeps the log free of the Windows user folder (which carries the account name):
-    paths in messages and tracebacks are shortened to <grain>, <temp> and ~."""
+    """Keeps the log free of the user folder (which carries the account name): paths in messages
+    and tracebacks are shortened to <grain>, <data>, <temp> and ~."""
 
     def __init__(self, fmt):
         super().__init__(fmt)
         home = os.path.expanduser("~")
-        temp = os.environ.get("TEMP", "")
+        temp = os.environ.get("TEMP") or os.environ.get("TMPDIR") or tempfile.gettempdir()
         pairs = [(DATA_DIR, "<data>"), (APP_DIR, "<grain>"), (temp, "<temp>"), (home, "~")]
         for long_path, label in list(pairs):  # Windows also writes 8.3 short forms like C:\Users\ABCDEF~1
             short = _short_path(long_path)
@@ -408,12 +408,7 @@ class PrivateFormatter(logging.Formatter):
 
 
 def _short_path(path):
-    import ctypes
-    if not path or not os.path.exists(path):
-        return ""
-    buffer = ctypes.create_unicode_buffer(1024)
-    ctypes.windll.kernel32.GetShortPathNameW(path, buffer, 1024)
-    return buffer.value
+    return platform.short_path(path)
 
 
 def main():

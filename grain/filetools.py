@@ -14,7 +14,8 @@ Actions, with {param} placeholders filled from Needle's arguments:
                 URL-encoded); optional empty_target is opened instead when none of its details were said
     run         program and args: started directly, never through a shell
     keys        keys: a shortcut like "win+shift+s", and/or text to type
-    powershell  script: arguments arrive as $env:GRAIN_<param>, never pasted into the script
+    powershell  script (run with pwsh off Windows): arguments arrive as GRAIN_<param> in the
+                environment, never pasted into the script
     http        method, url, headers, body: a request to a local or web service
 """
 import json
@@ -27,6 +28,7 @@ import threading
 import urllib.parse
 import urllib.request
 
+from . import platform
 from .launch import open_target
 from .registry import Tool
 
@@ -124,12 +126,15 @@ def make_handler(action):
             return "sent " + (action.get("keys") or "text")
     elif kind == "powershell":
         script = action["script"]
+        # Windows PowerShell takes -ExecutionPolicy; pwsh on Linux has no such concept and rejects it.
+        flags = ["-NoProfile", "-ExecutionPolicy", "Bypass"] if platform.IS_WINDOWS else ["-NoProfile"]
+        shell = "powershell" if platform.IS_WINDOWS else "pwsh"
 
         def handler(**arguments):
             env = dict(os.environ, **{f"GRAIN_{k}": str(v) for k, v in arguments.items()})
-            done = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+            done = subprocess.run([shell, *flags, "-Command", script],
                                   env=env, capture_output=True, text=True, timeout=action.get("timeout", 15),
-                                  creationflags=subprocess.CREATE_NO_WINDOW)
+                                  **platform.no_window())
             output = (done.stdout or done.stderr).strip()
             return output[:200] or f"script finished (exit {done.returncode})"
     else:  # http

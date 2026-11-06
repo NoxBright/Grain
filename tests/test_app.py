@@ -10,17 +10,31 @@ import socket
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _isolation  # noqa: E402,F401  (every temp folder is removed when the run ends)
 os.environ.setdefault("GRAIN_DATA_DIR", tempfile.mkdtemp(prefix="grain-tests-data-"))
 import grain.offline  # noqa: E402,F401
 
 import grain.config as config_module  # noqa: E402
+import grain.platform as platform  # noqa: E402
 from grain import __version__, settings  # noqa: E402
 from grain.config import DEFAULT_CONFIG, Config  # noqa: E402
+
+
+def write(path, text):
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(text)
+
+
+def read(path):
+    with open(path, encoding="utf-8") as handle:
+        return handle.read()
 
 
 def free_port():
@@ -34,8 +48,8 @@ class DataFolder(unittest.TestCase):
         self.app_dir, self.data_dir = tempfile.mkdtemp(), tempfile.mkdtemp()
         for folder in ("tools", "plugins"):
             os.makedirs(os.path.join(self.app_dir, "defaults", folder))
-        open(os.path.join(self.app_dir, "defaults", "tools", "a.json"), "w").write("{}")
-        open(os.path.join(self.app_dir, "defaults", "plugins", "b.py"), "w").write("")
+        write(os.path.join(self.app_dir, "defaults", "tools", "a.json"), "{}")
+        write(os.path.join(self.app_dir, "defaults", "plugins", "b.py"), "")
         self.patches = [mock.patch.object(config_module, "DEFAULTS_DIR", os.path.join(self.app_dir, "defaults")),
                         mock.patch.object(config_module, "DATA_DIR", self.data_dir)]
         for patch in self.patches:
@@ -55,7 +69,7 @@ class DataFolder(unittest.TestCase):
         os.remove(tool)  # the user deletes a default tool
         config_module._install_defaults(config)
         self.assertFalse(os.path.exists(tool))
-        open(os.path.join(self.app_dir, "defaults", "tools", "new.json"), "w").write("{}")  # a later version adds one
+        write(os.path.join(self.app_dir, "defaults", "tools", "new.json"), "{}")  # a later version adds one
         config_module._install_defaults(config)
         self.assertTrue(os.path.exists(os.path.join(self.data_dir, "tools", "new.json")))
 
@@ -63,9 +77,9 @@ class DataFolder(unittest.TestCase):
         config = {"installed_defaults": []}
         config_module._install_defaults(config)
         mine = os.path.join(self.data_dir, "tools", "a.json")
-        open(mine, "w").write('{"edited": true}')
+        write(mine, '{"edited": true}')
         config_module._install_defaults(config)
-        self.assertEqual(open(mine).read(), '{"edited": true}')
+        self.assertEqual(read(mine), '{"edited": true}')
 
 
 class Upgrades(unittest.TestCase):
@@ -84,22 +98,22 @@ class Upgrades(unittest.TestCase):
 
     def test_legacy_files_beside_the_exe_move_to_the_data_folder(self):
         app_dir, data_dir = tempfile.mkdtemp(), tempfile.mkdtemp()
-        json.dump({"hotkey": "ctrl+alt+g"}, open(os.path.join(app_dir, "assistant_config.json"), "w"))
-        open(os.path.join(app_dir, "history.jsonl"), "w").write('{"id": "x"}\n')
+        write(os.path.join(app_dir, "assistant_config.json"), json.dumps({"hotkey": "ctrl+alt+g"}))
+        write(os.path.join(app_dir, "history.jsonl"), '{"id": "x"}\n')
         targets = {"assistant_config.json": os.path.join(data_dir, "settings.json"),
                    "history.jsonl": os.path.join(data_dir, "history.jsonl"), "notes.md": os.path.join(data_dir, "notes.md")}
         with mock.patch.object(config_module, "APP_DIR", app_dir), mock.patch.object(config_module, "LEGACY_FILES", targets), \
                 mock.patch.object(config_module, "CONFIG_PATH", targets["assistant_config.json"]):
             self.assertTrue(config_module._migrate_legacy_folder())
             self.assertFalse(config_module._migrate_legacy_folder())  # only once
-        self.assertEqual(json.load(open(targets["assistant_config.json"]))["hotkey"], "ctrl+alt+g")
+        self.assertEqual(json.loads(read(targets["assistant_config.json"]))["hotkey"], "ctrl+alt+g")
 
     def test_settings_are_saved_atomically(self):
         path = os.path.join(tempfile.mkdtemp(), "settings.json")
         config = Config({"a": 1})
         config.path = path
         config.save()
-        self.assertEqual(json.load(open(path)), {"a": 1})
+        self.assertEqual(json.loads(read(path)), {"a": 1})
         self.assertFalse(os.path.exists(path + ".tmp"))
 
 
@@ -145,7 +159,10 @@ class Api(unittest.TestCase):
         headers = {"Content-Type": "application/json", "Authorization": f"Bearer {token}"}
         conn.request(method, path, json.dumps(body) if body is not None else None, headers)
         response = conn.getresponse()
-        return response.status, json.loads(response.read() or b"{}")
+        try:
+            return response.status, json.loads(response.read() or b"{}")
+        finally:
+            conn.close()
 
     def test_read_and_change_settings_live(self):
         status, data = self.call("GET", "/v1/settings")
@@ -348,6 +365,7 @@ class Updates(unittest.TestCase):
 
 
 class UninstallerLeftovers(unittest.TestCase):
+    @unittest.skipUnless(platform.IS_WINDOWS, "the installer writes registry keys and Start-menu shortcuts")
     def test_only_old_grain_unpack_folders_are_recognised(self):
         sys.path.insert(0, os.path.join(ROOT, "installer"))
         import grain_setup
@@ -374,15 +392,10 @@ class UninstallerLeftovers(unittest.TestCase):
 
 class SingleInstance(unittest.TestCase):
     def test_second_claim_fails(self):
-        import ctypes
         from grain import app
-        name = f"Local\\GrainTest-{os.getpid()}"  # same mechanism as claim_single_instance, under a test-only name
-        first =ctypes.windll.kernel32.CreateMutexW(None, False, name)
-        self.assertNotEqual(ctypes.windll.kernel32.GetLastError(), 183)
-        second = ctypes.windll.kernel32.CreateMutexW(None, False, name)
-        self.assertEqual(ctypes.windll.kernel32.GetLastError(), 183)  # what claim_single_instance checks
-        ctypes.windll.kernel32.CloseHandle(first)
-        ctypes.windll.kernel32.CloseHandle(second)
+        name = f"GrainTest-{os.getpid()}"  # the same mechanism claim_single_instance uses, under a test-only name
+        self.assertTrue(platform.claim_single_instance(name))  # first claim wins
+        self.assertFalse(platform.claim_single_instance(name))  # a second one is refused
         self.assertTrue(callable(app.claim_single_instance))
 
 

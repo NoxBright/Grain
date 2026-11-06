@@ -19,7 +19,7 @@ import threading
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import __version__, keys, settings
+from . import __version__, keys, platform, settings
 from .config import (DATA_DIR, ICON_PATH, LOG_PATH, NOTES_PATH, PLUGINS_DIR, TOOLS_DIR, UI_DIR, USER_MODELS_DIR,
                      needle_weights)
 from .filetools import save_tool_file
@@ -407,7 +407,7 @@ class Handler(BaseHTTPRequestHandler):
                 open(path, "a", encoding="utf-8").close()
             else:
                 os.makedirs(path, exist_ok=True)
-        os.startfile(path)
+        platform.open_path(path)
         return {"opened": which}
 
     def check_updates(self):

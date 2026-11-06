@@ -6,12 +6,18 @@ import queue
 import shutil
 import sys
 
+from . import platform
+
 RATE = 16000  # Whistle wants 16 kHz mono float
 
 
 def import_sounddevice():
     """sounddevice's bundled PortAudio DLL can sit past Windows' 260-character path limit.
-    If it won't load, copy it to a short folder as portaudio.dll, where sounddevice looks first."""
+    If it won't load, copy it to a short folder as portaudio.dll, where sounddevice looks first.
+    Linux loads its shared object directly, so there is no short path to make there."""
+    if not platform.IS_WINDOWS:
+        import sounddevice
+        return sounddevice
     try:
         import sounddevice
         return sounddevice

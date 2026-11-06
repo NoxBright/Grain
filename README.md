@@ -200,6 +200,37 @@ needle build --lora my-adapter.safetensors --out models\needle3-mine.cact
 
 Put the `.cact` file in `%APPDATA%\Grain\models`, then set **Model file** in Settings to `models\needle3-mine.cact`. It takes effect on the next command. Locally trained adapters don't report confidence, so Grain runs every call the model makes. Set risky tools to `confirm` first.
 
+## Running on Linux
+
+The core engine runs natively on Linux: phrase matching, Needle's tool calling, the tool
+registry, plugins, profiles, history and the local API. The tray, global hotkey and microphone
+are Windows-only for now.
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+# Model weights are not in the repo: link them from an installed Grain, or download needle3.cact
+# and whistle.cact into models/.
+.venv/bin/python grain_app.py --text "what time is it" --dry-run
+.venv/bin/python -m unittest discover tests -v
+```
+
+What differs per OS lives in [grain/platform.py](grain/platform.py): opening things, the window
+in front, media keys, locking the session, installed programs, session startup, single instance,
+battery charge and hotkey names. Everything else asks that module and never checks the OS.
+
+Two things need setting up once:
+
+- **Needle's engine.** `needle` is pure Python but loads a native `libneedle.so`. Put it in
+  `~/.cache/cactus-needle/v3/3.3.3/libneedle.so`, or point `NEEDLE3_LIB_PATH` at it. The wheel
+  is `python/cactus_needle-3.3.3-py3-none-manylinux2014_x86_64.whl` in the `Cactus-Compute/needle3`
+  repo on Hugging Face; note `main` no longer carries the `python/` folder, so fetch it from the
+  commit that still has it. Grain's `offline.py` blocks network access at runtime, so the engine
+  has to be in place before Grain starts.
+- **`keyboard`.** Grain uses it for hotkey names. On Linux it shells out to `dumpkeys`, which
+  needs a console descriptor a normal process doesn't have, so hotkey *names* are checked against
+  keyboard's static tables instead (see `platform.parse_hotkey`). Registering a global hotkey
+  still needs a different approach on Linux.
+
 ## Tests
 
 | File | What it covers |

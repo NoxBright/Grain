@@ -11,6 +11,8 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _isolation  # noqa: E402,F401  (every temp folder is removed when the run ends)
 DATA = tempfile.mkdtemp(prefix="grain-offline-")
 os.environ["GRAIN_DATA_DIR"] = DATA
 

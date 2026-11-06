@@ -1,45 +1,39 @@
-"""Opening things on Windows, shared by the built-in tools and plugins."""
+"""Opening things, shared by the built-in tools and plugins. Which programs are installed, and
+how one is launched, differ per OS: platform.py owns that, this module owns the matching."""
 import difflib
-import json
-import os
 import re
-import subprocess
 import threading
 import time
+
+from . import platform
 
 _notifier = print  # replaced by the app with its tray notification
 _apps_lock = threading.Lock()
 _apps, _apps_read_at = {}, 0.0
-REFRESH_SECONDS = 60  # re-read the Start menu at most once a minute, and only when a name isn't found
+REFRESH_SECONDS = 60  # re-read the installed programs at most once a minute, and only when a name isn't found
 
-# Start-menu entries that are never what someone means by "open X"
+# Installed entries that are never what someone means by "open X"
 NOT_PROGRAMS = re.compile(r"\b(uninstall|uninstaller|help|readme|read me|support|documentation|manual|release notes|"
                           r"website|license|licence|changelog)\b", re.IGNORECASE)
 
 
 def start_menu_apps(refresh=False):
-    """Every Start-menu entry as {name: AppID}, the same list Start itself shows (Store apps included)."""
+    """Every installed program as {name: target}, the same list the desktop's own menu shows."""
     global _apps, _apps_read_at
     with _apps_lock:
         stale = time.time() - _apps_read_at > REFRESH_SECONDS
         if not _apps or (refresh and stale):
-            found = subprocess.run(
-                ["powershell", "-NoProfile", "-Command",
-                 "Get-StartApps | Select-Object Name, AppID | ConvertTo-Json -Compress"],
-                capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW).stdout
-            entries = json.loads(found or "[]")
-            entries = [entries] if isinstance(entries, dict) else entries
-            _apps = {e["Name"]: e["AppID"] for e in entries if e.get("Name") and e.get("AppID")}
+            _apps = platform.scan_applications()
             _apps_read_at = time.time()
         return dict(_apps)
 
 
 def start_menu_target(name):
-    """The shell:AppsFolder path for an exact Start-menu name, or None."""
+    """The openable target for an exact installed-program name, or None."""
     apps = start_menu_apps()
     if name not in apps:
         apps = start_menu_apps(refresh=True)  # maybe installed since Grain started
-    return "shell:AppsFolder\\" + apps[name] if name in apps else None
+    return platform.start_menu_target(apps[name]) if name in apps else None
 
 
 def _simple(text):
@@ -47,7 +41,7 @@ def _simple(text):
 
 
 def find_start_app(spoken, aliases=None):
-    """The Start-menu name that best matches what someone said, or None.
+    """The installed-program name that best matches what someone said, or None.
     Tries, in order: aliases, the exact name, the name without spaces ("chatgpt" / "Chat GPT"),
     a name that starts with it ("gog" -> "GOG GALAXY"), one containing all its words, then a close spelling."""
     def search(apps):
@@ -79,13 +73,13 @@ def find_start_app(spoken, aliases=None):
 
 
 def open_target(target):
-    """Open a program, file, folder or URL, or "start:<Start-menu name>". Raises if it can't be found."""
+    """Open a program, file, folder or URL, or "start:<installed program name>". Raises if it can't be found."""
     if target.startswith("start:"):
         resolved = start_menu_target(target[len("start:"):])
         if resolved is None:
-            raise FileNotFoundError(f"couldn't find {target[len('start:'):]!r} in the Start menu")
+            raise FileNotFoundError(f"couldn't find {target[len('start:'):]!r} among the installed programs")
         target = resolved
-    os.startfile(target)
+    platform.open_path(target)
 
 
 def notify(message):

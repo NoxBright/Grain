@@ -1,16 +1,12 @@
-"""The settings people can change from the tool editor: validation, starting with Windows, update checks."""
+"""The settings people can change from the tool editor: validation, starting with the session,
+update checks. Starting at login is a registry key on Windows and an autostart entry on Linux,
+both behind platform.autostart_*."""
 import json
-import os
 import re
-import sys
 import urllib.request
-import winreg
 
-from . import __version__
-from .config import APP_DIR, FROZEN
+from . import __version__, platform
 
-RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
-RUN_NAME = "Grain"
 NEEDS_RESTART = {"api_port"}
 
 
@@ -31,10 +27,9 @@ def _boolean(value):
 
 
 def _hotkey(value):
-    import keyboard
     value = str(value).strip().lower()
     try:
-        keyboard.parse_hotkey(value)
+        platform.parse_hotkey(value)
     except ValueError as error:
         raise ValueError(f"isn't a key combination Grain understands ({error})")
     if "+" not in value:
@@ -53,7 +48,7 @@ def _words(value):
 
 def _device(value):
     if value is not None and not isinstance(value, str):
-        raise ValueError("must be a microphone name, or empty for the Windows default")
+        raise ValueError("must be a microphone name, or empty for this system's default")
     return value or None
 
 
@@ -113,34 +108,16 @@ def public(config):
     return {key: config.get(key) for key in SCHEMA} | {"start_with_windows": starts_with_windows()}
 
 
-# ---------------------------------------------------------------- starting with Windows
-
-def _launch_command():
-    if FROZEN:
-        return f'"{sys.executable}"'
-    pythonw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
-    return f'"{pythonw}" "{os.path.join(APP_DIR, "grain_app.py")}"'
-
+# ---------------------------------------------------------------- starting with the session
 
 def starts_with_windows():
-    try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as key:
-            winreg.QueryValueEx(key, RUN_NAME)
-            return True
-    except OSError:
-        return False
+    """Named after Windows for the API's sake; on Linux it is the XDG autostart entry."""
+    return platform.autostart_enabled()
 
 
 def set_start_with_windows(enabled):
     """A per-user startup entry (no admin rights needed); the uninstaller removes it."""
-    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as key:
-        if enabled:
-            winreg.SetValueEx(key, RUN_NAME, 0, winreg.REG_SZ, _launch_command())
-        else:
-            try:
-                winreg.DeleteValue(key, RUN_NAME)
-            except FileNotFoundError:
-                pass
+    platform.set_autostart(enabled)
 
 
 # ---------------------------------------------------------------- updates

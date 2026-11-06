@@ -6,7 +6,6 @@ intercepted, so running this changes nothing on screen:
     .venv\\Scripts\\python -m unittest discover tests -v
 """
 import copy
-import ctypes
 import os
 import sys
 import tempfile
@@ -17,6 +16,8 @@ from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _isolation  # noqa: E402,F401  (every temp folder is removed when the run ends)
 os.environ.setdefault("GRAIN_DATA_DIR", tempfile.mkdtemp(prefix="grain-tests-data-"))  # never the real %APPDATA%\Grain
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 import grain.offline  # noqa: E402,F401
@@ -26,7 +27,9 @@ import keyboard  # noqa: E402
 import grain.builtin  # noqa: E402
 import grain.config  # noqa: E402
 import grain.launch  # noqa: E402
+import grain.platform  # noqa: E402
 from grain import profiles  # noqa: E402
+from grain import platform  # noqa: E402
 from grain.config import DEFAULT_CONFIG, Config  # noqa: E402
 from grain.phrases import clean_arguments, parse_number  # noqa: E402
 from grain.registry import Tool  # noqa: E402
@@ -67,13 +70,13 @@ class FakeTimer:
 def setUpModule():
     global grain_app, patches
     patches = [
-        mock.patch("grain.launch.os.startfile", lambda target: effects.opened.append(target)),
+        mock.patch("grain.platform.open_path", lambda target: effects.opened.append(target)),
         mock.patch("grain.launch.start_menu_apps", lambda refresh=False: dict(FAKE_START_MENU)),
         mock.patch.object(webbrowser, "open", lambda url, *a, **k: effects.browsed.append(url)),
         mock.patch.object(keyboard, "send", lambda keys, *a, **k: effects.keys.append(keys)),
         mock.patch.object(keyboard, "write", lambda text, *a, **k: effects.typed.append(text)),
         mock.patch("grain.builtin.press_key", lambda vk, times=1: effects.pressed.append((vk, times))),
-        mock.patch.object(ctypes.windll.user32, "LockWorkStation", lambda: setattr(effects, "locked", effects.locked + 1)),
+        mock.patch("grain.platform.lock_workstation", lambda: setattr(effects, "locked", effects.locked + 1)),
         mock.patch.object(threading, "Timer", FakeTimer),
         mock.patch.object(grain.config, "NOTES_PATH", NOTES),
     ]
@@ -129,7 +132,7 @@ class PhraseCommands(unittest.TestCase):
                     self.assertEqual(effects.opened, [])
                     continue
                 self.ran(spoken)
-                self.assertEqual(effects.opened, [f"shell:AppsFolder\\{FAKE_START_MENU[start_name]}"])
+                self.assertEqual(effects.opened, [platform.start_menu_target(FAKE_START_MENU[start_name])])
 
     def test_program_names_are_matched_carefully(self):
         from grain.launch import find_start_app
@@ -193,7 +196,7 @@ class PhraseCommands(unittest.TestCase):
     def test_screenshot(self):
         self.ran("Take a screenshot.")
         self.assertEqual(effects.keys, ["windows+shift+s"])
-        keyboard.parse_hotkey("windows+shift+s")  # raises if the key names are wrong
+        grain.platform.parse_hotkey("windows+shift+s")  # raises if the key names are wrong
 
     def test_battery(self):
         message = self.ran("Battery level.")["message"]
