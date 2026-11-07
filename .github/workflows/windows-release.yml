@@ -35,6 +35,10 @@ jobs:
               hf_hub_download(repo_id=repo, filename=filename, local_dir="models")
           '@ | python -
 
+      - name: Cache the official Windows Needle engine
+        shell: pwsh
+        run: python -c "from needle.agent import fetch; print(fetch.fetch_library(generation=3, dest_dir=fetch.cache_dir(3)))"
+
       - name: Run tests
         shell: pwsh
         run: python -m unittest discover tests -v
@@ -65,6 +69,10 @@ jobs:
                                  ("Cactus-Compute/whistle", "whistle.cact")):
               hf_hub_download(repo_id=repo, filename=filename, local_dir="models")
           '@ | python -
+
+      - name: Cache the official Windows Needle engine
+        shell: pwsh
+        run: python -c "from needle.agent import fetch; print(fetch.fetch_library(generation=3, dest_dir=fetch.cache_dir(3)))"
 
       - name: Warm and verify the native Needle engine
         shell: pwsh
