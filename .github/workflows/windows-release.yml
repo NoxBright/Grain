@@ -1,0 +1,85 @@
+name: Windows release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        shell: pwsh
+        run: python -m pip install -r requirements-build-windows.txt
+
+      - name: Download official model files
+        shell: pwsh
+        run: |
+          @'
+          from huggingface_hub import hf_hub_download
+
+          for repo, filename in (("Cactus-Compute/needle3", "needle3.cact"),
+                                 ("Cactus-Compute/whistle", "whistle.cact")):
+              hf_hub_download(repo_id=repo, filename=filename, local_dir="models")
+          '@ | python -
+
+      - name: Run tests
+        shell: pwsh
+        run: python -m unittest discover tests -v
+
+  build-windows:
+    needs: test-windows
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        shell: pwsh
+        run: python -m pip install -r requirements-build-windows.txt
+
+      - name: Download official model files
+        shell: pwsh
+        run: |
+          @'
+          from huggingface_hub import hf_hub_download
+
+          for repo, filename in (("Cactus-Compute/needle3", "needle3.cact"),
+                                 ("Cactus-Compute/whistle", "whistle.cact")):
+              hf_hub_download(repo_id=repo, filename=filename, local_dir="models")
+          '@ | python -
+
+      - name: Warm and verify the native Needle engine
+        shell: pwsh
+        run: python -m unittest tests.test_offline -v
+
+      - name: Build Windows distribution
+        shell: pwsh
+        run: .\build.ps1
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Grain-Windows-${{ github.sha }}
+          path: |
+            dist/Grain/
+            dist/Grain Setup *.exe
+          if-no-files-found: error
+          retention-days: 14

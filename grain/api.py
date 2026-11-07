@@ -20,8 +20,8 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import __version__, keys, platform, settings
-from .config import (DATA_DIR, ICON_PATH, LOG_PATH, NOTES_PATH, PLUGINS_DIR, TOOLS_DIR, UI_DIR, USER_MODELS_DIR,
-                     needle_weights)
+from .config import (DATA_DIR, ICON_PATH, LOG_PATH, MODELS_DIR, NOTES_PATH, PLUGINS_DIR, TOOLS_DIR, UI_DIR, USER_MODELS_DIR,
+                     missing_models, needle_weights)
 from .filetools import save_tool_file
 from .registry import NAME_PATTERN, SAFETY
 
@@ -178,7 +178,8 @@ class Handler(BaseHTTPRequestHandler):
                 "confidence_threshold": grain.config["confidence_threshold"], "confirm_seconds": grain.config["confirm_seconds"],
                 "version": __version__, "setup_done": bool(grain.config.get("setup_done")),
                 "tool_count": len(grain.registry.all()), "too_many_tools": len(active) > grain.TOO_MANY_TOOLS,
-                "pending": len(grain.engine.pending_list()), "mic": grain.mic_name, "load_errors": grain.load_errors}
+                "pending": len(grain.engine.pending_list()), "mic": grain.mic_name, "load_errors": grain.load_errors,
+                "models_ready": not missing_models(), "missing_models": missing_models()}
 
     def list_tools(self):
         active = {t.name for t in self.grain.active_tools()}
@@ -398,6 +399,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def open_folder(self, which):
         targets = {"data": DATA_DIR, "tools": TOOLS_DIR, "plugins": PLUGINS_DIR, "models": USER_MODELS_DIR,
+                   "app_models": MODELS_DIR,
                    "log": LOG_PATH, "notes": NOTES_PATH}
         path = targets.get(which)
         if path is None:

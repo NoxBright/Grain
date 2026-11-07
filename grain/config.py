@@ -51,6 +51,12 @@ DEFAULTS_DIR = os.path.join(APP_DIR, "defaults") if os.path.isdir(os.path.join(A
 ICON_PATH = os.path.join(BUNDLE, "assets", "grain.png")
 UI_DIR = os.path.join(BUNDLE, "grain", "ui")
 
+
+def missing_models():
+    """The bundled model files missing before the engine can do useful work."""
+    return [name for name, path in (("needle3.cact", NEEDLE_WEIGHTS), ("whistle.cact", WHISTLE_WEIGHTS))
+            if not os.path.isfile(path)]
+
 CONFIG_VERSION = 2  # bump with a step in MIGRATIONS when the settings format changes
 
 DEFAULT_CONFIG = {
@@ -78,7 +84,7 @@ DEFAULT_CONFIG = {
         "settings": "ms-settings:",
         "browser": "https://duckduckgo.com",
     },
-    "app_aliases": {},  # other ways of saying an app's name -> its key in "apps"
+    "app_aliases": {},  # aliases for configured apps or installed Start-menu names
     "api_port": 8765,
     "api_token": None,  # the owner key, for the tool editor; generated on first run
     "api_keys": [],  # program keys made in the tool editor: {id, client, hash, created, last_used} (keys.py)
@@ -96,16 +102,8 @@ DEFAULT_CONFIG = {
                    "set_timer"],
     },
     # With active_profile "auto", the app in front picks the profile.
-    "profile_rules": [
-        {"process": "Code.exe", "profile": "coding"},
-        {"process": "devenv.exe", "profile": "coding"},
-        {"process": "WindowsTerminal.exe", "profile": "coding"},
-        {"process": "steam*.exe", "profile": "gaming"},
-        {"process": "GalaxyClient*.exe", "profile": "gaming"},
-        {"process": "Discord.exe", "profile": "gaming"},
-        {"process": "Spotify.exe", "profile": "media"},
-        {"process": "vlc.exe", "profile": "media"},
-    ],
+    # Empty by default: users can opt into foreground-app rules for their own software.
+    "profile_rules": [],
     "installed_defaults": [],  # default tool/plugin files already copied, so deleted ones stay deleted
 }
 

@@ -1,5 +1,5 @@
-# Builds "Grain App.exe" into this folder. It reads models\, tools\, plugins\ and
-# assistant_config.json beside itself, so keep it here or copy those along.
+# Builds "Grain App.exe" into this folder. It reads models\, tools\, plugins\ and assets\
+# beside itself; user settings remain in the normal Grain data directory.
 # PyInstaller's working files (full of absolute paths) go to a temp folder that is removed afterwards.
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot

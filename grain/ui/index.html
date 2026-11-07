@@ -141,6 +141,8 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .switch { display: inline-flex; gap: 7px; align-items: center; cursor: pointer; font-size: 13px; }
 
 /* settings and setup */
+.setup-only { display: none; }
+.setup-only.reveal { display: block; }
 .set-grid { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 10px 18px; align-items: center; margin-top: 10px; }
 .set-grid > label { font-weight: 600; font-size: 13px; }
 .set-grid .help { grid-column: 2; color: var(--muted); font-size: 12.5px; margin-top: -6px; }
@@ -383,6 +385,21 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
 <section class="g panel" id="g-start" data-title="Getting started">
   <h2>Getting started</h2>
   <p>Grain is a voice assistant that runs entirely on this computer. <b>Whistle</b> turns your speech into text, Grain checks it against your tools' phrases, and if nothing matches, <b>Needle</b> (a small AI) guesses which tool you meant. No internet needed, and nothing you say leaves your PC.</p>
+  <h3>Before the first run: install the model files</h3>
+  <p>Grain needs these two local files before it can understand speech or choose tools:</p>
+  <ul>
+    <li><code>needle3.cact</code> — Needle's tool-calling model</li>
+    <li><code>whistle.cact</code> — Whistle's speech-to-text model</li>
+  </ul>
+  <p>Download them from the official Cactus Compute model pages:
+    <a href="https://huggingface.co/Cactus-Compute/needle3" target="_blank" rel="noreferrer">Needle 3</a>
+    and <a href="https://huggingface.co/Cactus-Compute/whistle" target="_blank" rel="noreferrer">Whistle</a>.</p>
+  <p>Place <b>both files in the <code>models</code> folder beside Grain</b>:</p>
+  <ul>
+    <li><b>Installed version:</b> the <code>models\</code> folder beside <code>Grain App.exe</code>, normally inside the Grain installation folder.</li>
+    <li><b>Running from source:</b> the repository's <code>models\</code> folder, beside <code>grain_app.py</code>.</li>
+  </ul>
+  <p class="note">Grain does not download model files automatically. After copying both files, restart Grain. If either file is missing, Grain opens the model setup instructions automatically.</p>
   <h3>Starting Grain</h3>
   <ul>
     <li>Install Grain with <b>Grain Setup</b>. It installs just for you (no administrator rights) and adds Grain to the Start menu. Your settings, history, notes and your own tools live separately in your data folder, <code>%APPDATA%\Grain</code>, so updating or reinstalling never loses them.</li>
@@ -397,7 +414,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   <h3>Talking to Grain</h3>
   <ul>
     <li><b>Hotkey:</b> press <kbd>__HOTKEY__</kbd> (or click the tray icon), then speak. Grain stops listening when you pause.</li>
-    <li><b>Wake word:</b> turn on <i>Wake word mode</i> in the tray menu, then start any command with <b>__WAKE__</b>, e.g. “__WAKE1__, open Steam”. This keeps the microphone open (other apps can still use it), and uses more CPU.</li>
+    <li><b>Wake word:</b> turn on <i>Wake word mode</i> in the tray menu, then start any command with <b>__WAKE__</b>, e.g. “__WAKE1__, open the editor”. This keeps the microphone open (other apps can still use it), and uses more CPU.</li>
     <li>Chain commands with “then”: “open notepad <b>then</b> set a timer for five minutes”.</li>
     <li>Results appear as Windows notifications. Everything is also logged in History.</li>
     <li>The hotkey doesn't work while a window running <b>as administrator</b> is in front. Windows doesn't let ordinary programs see keys pressed in admin windows. Click another window first, or use wake word mode.</li>
@@ -415,6 +432,26 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     <tr><td><b>Open notes / log</b></td><td>Notes you've dictated; Grain's technical log.</td></tr>
     <tr><td><b>About Grain</b></td><td>Which version you have.</td></tr>
   </table>
+</section>
+
+<section class="g panel setup-only" id="g-models" data-title="Set up model files" data-hidden="true">
+  <h2>Set up Grain's model files</h2>
+  <p>Grain needs two local Cactus Compute model files before it can transcribe speech or choose a tool:</p>
+  <ul>
+    <li><code>needle3.cact</code> — the local tool-calling model.</li>
+    <li><code>whistle.cact</code> — the local speech-to-text model.</li>
+  </ul>
+  <p>Download them only from the official Cactus Compute model pages:
+    <a href="https://huggingface.co/Cactus-Compute/needle3" target="_blank" rel="noreferrer">Needle 3</a>
+    and <a href="https://huggingface.co/Cactus-Compute/whistle" target="_blank" rel="noreferrer">Whistle</a>.
+    The Cactus runtime source and documentation are on
+    <a href="https://github.com/cactus-compute/cactus" target="_blank" rel="noreferrer">GitHub</a>.</p>
+  <p>Place both files in Grain's installed <code>models</code> folder. For a source checkout, that is
+    <code>models\</code> beside <code>grain_app.py</code>. For the installed Windows app, use the
+    <code>models\</code> folder beside <code>Grain App.exe</code>.</p>
+  <p class="note">Grain does not download model files automatically. The files are used locally and
+    must be present before restarting Grain.</p>
+  <div class="row"><button class="btn" id="modelSetupOpen">Open the Grain models folder</button><button class="btn primary" id="modelSetupReload">Check again</button></div>
 </section>
 
 <section class="g panel" id="g-mic" data-title="Microphone and troubleshooting">
@@ -438,7 +475,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   <ol>
     <li><b>Phrases first.</b> If what you said fits one of a tool's phrases, Grain uses it straight away, with the exact words you said. This is fast and always right.</li>
     <li><b>Otherwise the AI guesses</b> from the active profile's tool descriptions, and reports how sure it is (0–100%). Grain then checks the guess: unknown tools, missing details and wrong kinds of value (“louder” for up/down/mute) are refused with “Couldn't run that”, and spoken numbers like “twenty five” are converted.</li>
-    <li><b>Confidence check.</b> Guesses below <b>__THRESHOLD__%</b> are skipped (change <code>confidence_threshold</code>, or per tool under <i>More options</i>). If you didn't mention anything to do with the chosen tool (its name, keywords or phrase words), the AI must be at least 80% sure. That stops confident nonsense like “fire up Steam” turning into “pause the music”. Phrase matches always pass.</li>
+    <li><b>Confidence check.</b> Guesses below <b>__THRESHOLD__%</b> are skipped (change <code>confidence_threshold</code>, or per tool under <i>More options</i>). If you didn't mention anything to do with the chosen tool (its name, keywords or phrase words), the AI must be at least 80% sure. That stops confident nonsense like “open the editor” turning into “pause the music”. Phrase matches always pass.</li>
     <li><b>Safety.</b> “Just do it” tools run. “Ask me first” tools wait: say <b>yes</b> or <b>cancel</b>, or use the tray menu or the Try it tab, within __CONFIRM__ seconds. “Only when sure” tools need the AI to be at least 80% sure.</li>
   </ol>
   <div class="callout">The AI is small (121 million parameters) and gets less accurate with more tools to choose from. <b>Phrases</b> and <b>profiles</b> are the two biggest ways to make Grain reliable.</div>
@@ -448,19 +485,19 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   <h2>Making tools</h2>
   <p>Open the <a href="#" data-goto="tools">Tools</a> tab and press <b>+ New</b>. Pick a template and fill in the steps. Your tool is saved as a file in your <code>tools</code> folder (<code>%APPDATA%\Grain\tools</code>) and works as soon as you save. No restart needed.</p>
   <h3>Opening programs</h3>
-  <p>You don't need a tool for each program: “open …”, “launch …” or “start …” finds any program in your Start menu, e.g. “open Steam” or “launch Discord”. Nicknames like “VS Code” and “GOG” are in <code>plugins\apps.py</code>, where you can add your own.</p>
+  <p>You don't need a tool for each program: “open …”, “launch …” or “start …” finds any program in your Start menu. Add your own speech aliases through <code>app_aliases</code> in settings.</p>
   <h3>Writing good phrases</h3>
   <ul>
     <li>Write them the way you actually talk: “open YouTube”, “youtube {query}”, “play {query} on youtube”.</li>
     <li>Add short and long versions. Grain picks the most specific phrase that fits.</li>
     <li>A phrase must match <i>everything</i> you said (capitals and punctuation don't matter), so “open youtube please” needs its own phrase.</li>
     <li><code>{word}</code> captures what you say there. Numbers can be spoken (“two” → 2). If a detail has <i>Only allow these</i> values, the spoken word must be one of them.</li>
-    <li>Check what Whistle actually heard in History, and add those spellings too (it might write “G.O.G.” for GOG).</li>
+    <li>Check what Whistle actually heard in History, and add those spellings to your own <code>app_aliases</code> if needed.</li>
   </ul>
   <h3>Actions</h3>
   <table>
     <tr><th>Action</th><th>Use it for</th><th>Notes</th></tr>
-    <tr><td>Open something</td><td>Websites, files, folders, programs</td><td><code>start:Steam</code> opens a Start-menu app by name. Details in a web address are made web-safe. In a tool file, <code>"empty_target"</code> is opened instead when no details were said (e.g. YouTube's home page).</td></tr>
+    <tr><td>Open something</td><td>Websites, files, folders, programs</td><td><code>start:App Name</code> opens a Start-menu app by name. Details in a web address are made web-safe. In a tool file, <code>"empty_target"</code> is opened instead when no details were said (e.g. YouTube's home page).</td></tr>
     <tr><td>Press keys / type</td><td>Shortcuts, dictation</td><td>Keys like <code>ctrl+shift+t</code>, <code>windows+d</code>.</td></tr>
     <tr><td>Send a web request</td><td>Robots, smart home, webhooks</td><td>JSON body; <code>"{steps}"</code> on its own keeps numbers as numbers.</td></tr>
     <tr><td>Start a program</td><td>Programs with arguments</td><td>Never goes through a command shell. Asks first by default.</td></tr>
@@ -491,7 +528,7 @@ def restart_service(service: Literal["web", "database"]):
     return f"restarted {service}"   # shown as the notification</pre></div>
   <ul>
     <li>The docstring's first line is the description the AI reads. Type hints become details: <code>str</code>, <code>int</code>, <code>float</code>, <code>bool</code>, or <code>Literal[...]</code> for a fixed list.</li>
-    <li><code>open_target("start:Discord")</code> opens programs, files or URLs; <code>notify("...")</code> shows a tray notification later (timers, background jobs).</li>
+    <li><code>open_target("start:App Name")</code> opens programs, files or URLs; <code>notify("...")</code> shows a tray notification later (timers, background jobs).</li>
     <li>Plugins run on Grain's built-in Python, so they can use the standard library and the packages Grain includes, but not packages you install separately.</li>
     <li>Examples: <code>plugins\apps.py</code> (opening programs, with an easy list to edit), <code>plugins\everyday.py</code>, <code>plugins\dice.py</code>.</li>
   </ul>
@@ -499,7 +536,7 @@ def restart_service(service: Literal["web", "database"]):
 
 <section class="g panel" id="g-profiles" data-title="Profiles">
   <h2>Profiles</h2>
-  <p>A profile is the set of tools the AI <i>guesses</i> between when nothing matches a phrase. Fewer tools means better guesses. <b>Phrases work in every profile</b>, so “open Steam” works whether you're gaming or coding.</p><p>Grain comes with five: <b>default</b> (everyday tools), <b>gaming</b> (used automatically when Steam, GOG Galaxy or Discord is in front), <b>coding</b> (VS Code, Visual Studio or Terminal), <b>media</b> (Spotify or VLC) and <b>system</b> (lock, battery and Windows apps; pick it from the tray).</p>
+  <p>A profile is the set of tools the AI <i>guesses</i> between when nothing matches a phrase. Fewer tools means better guesses. <b>Phrases work in every profile</b>. Grain comes with five: <b>default</b> (everyday tools), <b>gaming</b> (open programs, media, volume), <b>coding</b> (programs, search, notes), <b>media</b> (video, media and volume) and <b>system</b> (lock, battery and system tools).</p>
   <ul>
     <li>Make profiles in the <a href="#" data-goto="profiles">Profiles</a> tab by ticking tools, e.g. <i>gaming</i> (open programs, media, volume) and <i>coding</i>.</li>
     <li>Choose one in the tray menu, or set <b>Automatic</b> and add rules like “when <code>Code.exe</code> is in front, use <i>coding</i>”. The app in front when you press the hotkey decides.</li>
@@ -1783,7 +1820,7 @@ async function loadGuide() {
   };
   $("doc").innerHTML = guideTemplate.replace(/__([A-Z0-9_]+?)__/g, (m, k) => k in values ? esc(values[k]) : m);
 
-  $("toc").innerHTML = [...$("doc").querySelectorAll("section.g")].map((sec) => `<a href="#${sec.id}" data-sec="${sec.id}">${esc(sec.dataset.title)}</a>`).join("");
+   $("toc").innerHTML = [...$("doc").querySelectorAll("section.g")].filter((sec) => sec.dataset.hidden !== "true").map((sec) => `<a href="#${sec.id}" data-sec="${sec.id}">${esc(sec.dataset.title)}</a>`).join("");
   $("toc").querySelectorAll("a").forEach((a) => a.addEventListener("click", (e) => {
     e.preventDefault(); $(a.dataset.sec).scrollIntoView({behavior: "smooth", block: "start"});
   }));
@@ -1813,6 +1850,12 @@ async function loadGuide() {
     try { await navigator.clipboard.writeText(token); toast("Access key copied"); } catch (e) { toast("Couldn't copy. Use Show and copy it by hand.", true); }
   });
   watchToc();
+  if (START_TAB === "model-setup") {
+    $("g-models").classList.add("reveal");
+    setTimeout(() => $("g-models").scrollIntoView({behavior: "smooth", block: "start"}), 0);
+    $("modelSetupOpen").onclick = () => api("POST", "/v1/open/app_models").catch((e) => toast(e.message, true));
+    $("modelSetupReload").onclick = () => loadGuide();
+  }
 }
 
 let tocObserver;
@@ -1849,6 +1892,7 @@ else {
   const startTab = START_TAB;
   loadTools().then(() => {
     if (startTab === "setup" || status.setup_done === false) openSetup();
+    else if (startTab === "model-setup") switchTab("guide");
     else if (startTab && startTab !== "tools" && document.getElementById(startTab)) switchTab(startTab);
   }).catch((e) => toast(e.message, true));
   api("GET", "/v1/history?limit=300").then((h) => { historyEntries = h.entries; const n = historyEntries.filter(reviewable).length; $("reviewCount").hidden = !n; $("reviewCount").textContent = n; }).catch(() => {});

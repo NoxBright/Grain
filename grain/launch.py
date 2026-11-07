@@ -43,7 +43,7 @@ def _simple(text):
 def find_start_app(spoken, aliases=None):
     """The installed-program name that best matches what someone said, or None.
     Tries, in order: aliases, the exact name, the name without spaces ("chatgpt" / "Chat GPT"),
-    a name that starts with it ("gog" -> "GOG GALAXY"), one containing all its words, then a close spelling."""
+    a name that starts with it, one containing all its words, then a close spelling."""
     def search(apps):
         programs = {n: a for n, a in apps.items() if not NOT_PROGRAMS.search(n) and not a.lower().startswith("http")}
         simple = {_simple(n): n for n in sorted(programs, key=len, reverse=True)}  # shorter names win ties

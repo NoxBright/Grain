@@ -4,5 +4,6 @@ __pycache__/
 dist/
 build/
 
-# Model weights: linked from the installed app, not source (see README "Running on Linux")
+# Model weights are release inputs but are kept out of normal source history because of their size.
+# See models/README.txt for provenance and acquisition details.
 models/*.cact

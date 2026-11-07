@@ -15,7 +15,9 @@ Write-Host "Building Grain $version"
 
 # The Needle engine DLL, bundled so the app never downloads it
 $engine = & $py -c "import os, needle.agent.fetch as f; print(os.path.join(f.cache_dir(3), 'libneedle.dll'))"
-if (-not (Test-Path $engine)) { throw "Needle engine not cached at $engine; run dev\smoke_test.py once first." }
+if (-not (Test-Path $engine)) {
+    throw "Needle native engine not found at $engine. Install the Windows build dependencies and run a local Needle model smoke test before building. Grain must have its engine available before packaging."
+}
 
 Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
 if (Test-Path dist) {

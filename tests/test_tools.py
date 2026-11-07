@@ -6,6 +6,7 @@ intercepted, so running this changes nothing on screen:
     .venv\\Scripts\\python -m unittest discover tests -v
 """
 import copy
+import json
 import os
 import sys
 import tempfile
@@ -79,11 +80,27 @@ def setUpModule():
         mock.patch("grain.platform.lock_workstation", lambda: setattr(effects, "locked", effects.locked + 1)),
         mock.patch.object(threading, "Timer", FakeTimer),
         mock.patch.object(grain.config, "NOTES_PATH", NOTES),
+        mock.patch.object(grain.config, "CONFIG_PATH", os.path.join(TEMP, "settings.json")),
     ]
     for patch in patches:
         patch.start()
     from grain.app import Grain  # after patching: plugins read NOTES_PATH when they load
     config = Config(copy.deepcopy(DEFAULT_CONFIG))
+    with open(os.path.join(TEMP, "settings.json"), "w", encoding="utf-8") as handle:
+        json.dump({"app_aliases": {"gog": "GOG GALAXY", "g o g": "GOG GALAXY",
+                                    "vs code": "Visual Studio Code"}}, handle)
+    config["apps"] = {"notepad": "notepad.exe", "calculator": "calc.exe", "settings": "ms-settings:",
+                       "browser": "https://duckduckgo.com"}
+    config["profile_rules"] = [
+        {"process": "Code.exe", "profile": "coding"},
+        {"process": "devenv.exe", "profile": "coding"},
+        {"process": "WindowsTerminal.exe", "profile": "coding"},
+        {"process": "steam*.exe", "profile": "gaming"},
+        {"process": "GalaxyClient*.exe", "profile": "gaming"},
+        {"process": "Discord.exe", "profile": "gaming"},
+        {"process": "Spotify.exe", "profile": "media"},
+        {"process": "vlc.exe", "profile": "media"},
+    ]
     config["api_token"] = "test"
     grain.config._install_defaults(config)  # the default tools and plugins, into the temporary data folder
     grain_app = Grain(config, lambda message: None, history_path=os.path.join(TEMP, "history.jsonl"))

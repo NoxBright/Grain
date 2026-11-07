@@ -13,7 +13,7 @@ from .api import serve
 from .audio import Microphone, capture_utterance, input_names, rescan_devices
 from .builtin import builtin_tools
 from .config import (APP_DIR, APP_NAME, DATA_DIR, HISTORY_PATH, ICON_PATH, LOG_PATH, NOTES_PATH, PLUGINS_DIR,
-                     TOOLS_DIR, load_config)
+                     TOOLS_DIR, load_config, missing_models)
 from .engine import Engine, Events
 from .history import History
 from .launch import set_notifier
@@ -291,6 +291,11 @@ class TrayApp:
         self.grain.engine.ready.wait()
         if self.grain.engine.load_error:
             self.notify(f"Startup failed: {self.grain.engine.load_error}")
+            return
+        missing = missing_models()
+        if missing:
+            self.notify("Grain needs its model files: " + ", ".join(missing))
+            webbrowser.open(editor_url(self.config, "?tab=model-setup"))
             return
         try:
             mic = self.open_mic(self.config["input_device"])

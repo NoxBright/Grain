@@ -27,9 +27,9 @@ mic / hotkey / API text ─→ Whistle ─→ split on "then" ─→ phrase matc
   | Profile | Used when | Tools Needle guesses between |
   |---|---|---|
   | `default` | Anything else | Open apps and programs, search, YouTube, media, volume, time, timer, notes, screenshot |
-  | `gaming` | Steam, GOG Galaxy or Discord in front | Programs, media, volume, screenshot, dice, timer, time |
-  | `coding` | VS Code, Visual Studio or Terminal in front | Programs, Windows apps, search, notes, timer, screenshot, time |
-  | `media` | Spotify or VLC in front | YouTube, media, volume, search, programs |
+  | `gaming` | Picked from the tray or by your own rule | Programs, media, volume, screenshot, dice, timer, time |
+  | `coding` | Picked from the tray or by your own rule | Programs, Windows apps, search, notes, timer, screenshot, time |
+  | `media` | Picked from the tray or by your own rule | YouTube, media, volume, search, programs |
   | `system` | Picked from the tray | Windows apps, lock, battery, volume, time, screenshot, timer |
 
 - **Argument check:** Needle's guesses are checked against the tool's parameters before anything runs.
@@ -120,7 +120,7 @@ The built-ins in [grain/builtin.py](grain/builtin.py) are general Windows comman
 
 | Tool | What it does |
 |---|---|
-| `open_app` | Opens Windows apps (Notepad, Calculator, File Explorer, Task Manager, Settings, the browser), listed under `apps` in `assistant_config.json` |
+| `open_app` | Opens Windows apps (Notepad, Calculator, File Explorer, Task Manager, Settings, the browser), listed under `apps` in `settings.json` |
 | `adjust_volume` | Volume up, down or mute |
 | `media_control` | Play/pause, next, previous, stop |
 | `tell_time` | Shows the time and date |
@@ -130,22 +130,22 @@ Everything else is a plugin or tool file, so you can edit or delete it:
 
 | File | Tools |
 |---|---|
-| [plugins/apps.py](plugins/apps.py) | `open_program`: Steam, GOG Galaxy, Discord, Claude, ChatGPT, VS Code |
+| [plugins/apps.py](plugins/apps.py) | `open_program`: finds installed programs by name or user-defined alias |
 | [plugins/everyday.py](plugins/everyday.py) | `search_web`, `set_timer`, `take_note` |
 | [plugins/dice.py](plugins/dice.py) | `roll_dice` |
 | `tools\*.json` | `open_youtube`, `take_screenshot`, `battery_level` |
 
 ### Opening programs
 
-[plugins/apps.py](plugins/apps.py) opens **any program in the user's Start menu**: "open Steam", "launch Discord", "start VS Code". No list to maintain.
+[plugins/apps.py](plugins/apps.py) opens **any program in the user's Start menu** by name. No product list is bundled and no association with a program maker is implied.
 - **Matching:** names are matched in order:
   - exact name
-  - the name without spaces ("chatgpt" finds "ChatGPT")
-  - a name it starts ("gog" finds "GOG GALAXY")
+  - the name without spaces
+  - a name it starts with
   - a name containing all its words
   - a close spelling
 - **Skipped entries:** uninstallers, help pages and website links in the Start menu are ignored.
-- **Nicknames:** `NICKNAMES` at the top of the file maps other ways of saying a name ("vs code", "g o g") to a Start-menu name. They only count if the app is installed.
+- **Aliases:** add entries to `app_aliases` in `settings.json` to map other ways of saying a name to an installed Start-menu name. They only count if the app is installed.
 - **Falling through:** the "open {app}" phrase has a `check`. When `{app}` isn't a real program, the phrase doesn't claim the request, so "start a timer" still reaches the timer.
 - **In your own plugins,** `from grain import open_target` opens any program, file, URL or `start:<name>`. A `check=` on `@tool` does the same fall-through for your own catch-all phrases.
 
@@ -200,36 +200,10 @@ needle build --lora my-adapter.safetensors --out models\needle3-mine.cact
 
 Put the `.cact` file in `%APPDATA%\Grain\models`, then set **Model file** in Settings to `models\needle3-mine.cact`. It takes effect on the next command. Locally trained adapters don't report confidence, so Grain runs every call the model makes. Set risky tools to `confirm` first.
 
-## Running on Linux
+## Supported platform
 
-The core engine runs natively on Linux: phrase matching, Needle's tool calling, the tool
-registry, plugins, profiles, history and the local API. The tray, global hotkey and microphone
-are Windows-only for now.
-
-```bash
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-# Model weights are not in the repo: link them from an installed Grain, or download needle3.cact
-# and whistle.cact into models/.
-.venv/bin/python grain_app.py --text "what time is it" --dry-run
-.venv/bin/python -m unittest discover tests -v
-```
-
-What differs per OS lives in [grain/platform.py](grain/platform.py): opening things, the window
-in front, media keys, locking the session, installed programs, session startup, single instance,
-battery charge and hotkey names. Everything else asks that module and never checks the OS.
-
-Two things need setting up once:
-
-- **Needle's engine.** `needle` is pure Python but loads a native `libneedle.so`. Put it in
-  `~/.cache/cactus-needle/v3/3.3.3/libneedle.so`, or point `NEEDLE3_LIB_PATH` at it. The wheel
-  is `python/cactus_needle-3.3.3-py3-none-manylinux2014_x86_64.whl` in the `Cactus-Compute/needle3`
-  repo on Hugging Face; note `main` no longer carries the `python/` folder, so fetch it from the
-  commit that still has it. Grain's `offline.py` blocks network access at runtime, so the engine
-  has to be in place before Grain starts.
-- **`keyboard`.** Grain uses it for hotkey names. On Linux it shells out to `dumpkeys`, which
-  needs a console descriptor a normal process doesn't have, so hotkey *names* are checked against
-  keyboard's static tables instead (see `platform.parse_hotkey`). Registering a global hotkey
-  still needs a different approach on Linux.
+The first public release supports Windows. The source contains additional experimental platform
+work, but no non-Windows packaged release is provided or supported yet.
 
 ## Tests
 
@@ -265,4 +239,14 @@ Before a public release:
 - **Licences:** the Needle and Whistle models are Apache-2.0 (Cactus Compute), so redistribution is allowed with the notices, which the build includes. pystray is LGPL-3.0, so it ships as plain, replaceable source in `_internal\pystray`, not compiled in. Everything else bundled is MIT, BSD, Apache or PSF. Grain itself is MIT-licensed ([LICENSE](LICENSE)), and the build ships it as `LICENSE.txt`.
 - **Version:** bump `__version__` in [grain/__init__.py](grain/__init__.py) and add a [CHANGELOG.md](CHANGELOG.md) entry. If the settings format changes, bump `CONFIG_VERSION` in [grain/config.py](grain/config.py) and add a step to `MIGRATIONS`.
 
-Dev-only scripts and test recordings are in `dev\` and never ship. `start_assistant.bat` runs Grain from source.
+The build environment needs both runtime and Windows build dependencies:
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-build-windows.txt
+```
+
+See [SECURITY.md](SECURITY.md) before publishing a release.
+
+Dev-only scripts and test recordings are in `dev\` and never ship; `dev\licenses-src\` is a
+release-build input for the model licence notices. `start_assistant.bat` runs Grain from source.

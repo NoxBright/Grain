@@ -25,7 +25,7 @@ First distributable release.
 - **Fully offline:** the models are bundled, the Needle library's download check is switched off, and the network libraries aren't in the build at all.
 - **Settings page** in the tool editor. The hotkey (press the keys you want), microphone with a live test, wake words, AI confidence, start with Windows, update checks, API port and a new access key. Changes apply without a restart, except the port.
 - **First-run setup** for the microphone, hotkey, wake word and startup.
-- **Any installed program opens by voice:** "open X" finds it in your Start menu, with nicknames such as "VS Code" and "GOG". It no longer needs a fixed list.
+- **Any installed program opens by voice:** "open X" finds it in your Start menu without a bundled product list. User-defined aliases are supported through `app_aliases`.
 - **One copy at a time:** starting Grain again opens the running copy's tool editor. If the API port is taken, Grain moves to the next free one.
 - **Update checks:** off by default; when turned on, Grain checks an update address you set.
 - **Smaller fixes:** the log rotates (about 3 MB at most), settings are saved atomically, there's an About item in the tray, and a version number throughout.
