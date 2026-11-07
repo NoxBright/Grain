@@ -3,7 +3,7 @@
 # PyInstaller's working files (full of absolute paths) go to a temp folder that is removed afterwards.
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
-$py = ".\.venv\Scripts\python.exe"
+$py = if (Test-Path ".\.venv\Scripts\python.exe") { ".\.venv\Scripts\python.exe" } else { (Get-Command python.exe).Source }
 $work = Join-Path $env:TEMP "grain-build"
 
 # Bundle the Needle engine DLL so the exe never has to download it.
