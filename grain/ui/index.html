@@ -1540,31 +1540,44 @@ async function loadProfiles() {
 }
 
 function profilesPayload() {
-  for (const pr of profileState.profiles) commitProfileRename(pr);
+  const built = buildProfilesPayload();
+  return built.payload;
+}
+function buildProfilesPayload() {
   const profiles = {};
+  const originalToName = new Map();
+  const problems = [];
   for (const pr of profileState.profiles) {
-    if (!pr.name.trim()) continue;
-    profiles[pr.name.trim()] = pr.all ? ["*"] : [...pr.picked, ...pr.extra];
+    const name = pr.name.trim(), original = pr.original || pr.name.trim();
+    if (!name) { problems.push("Profile names cannot be empty"); continue; }
+    if (profiles[name]) { problems.push(`Profile name “${name}” is used more than once`); continue; }
+    profiles[name] = pr.all ? ["*"] : [...pr.picked, ...pr.extra];
+    if (original) originalToName.set(original, name);
   }
-  return {profiles, profile_rules: profileState.rules.filter((r) => r.process.trim()), active_profile: profileState.active};
+  const rewrite = (name) => originalToName.get(name) || name;
+  const rules = profileState.rules.filter((r) => typeof r.process === "string" && r.process.trim())
+    .map((r) => ({...r, profile: rewrite(r.profile)}));
+  rules.forEach((r) => { if (!profiles[r.profile]) problems.push(`A rule points to missing profile “${r.profile}”`); });
+  const active = profileState.active === "auto" ? "auto" : rewrite(profileState.active);
+  if (active !== "auto" && !profiles[active]) problems.push(`The active profile “${active}” no longer exists`);
+  return {payload: {profiles, profile_rules: rules, active_profile: active}, problems: [...new Set(problems)]};
 }
 function commitProfileRename(pr) {
-  const old = pr.original;
-  const next = pr.name.trim();
-  if (old && next && old !== next) {
-    if (profileState.active === old) profileState.active = next;
-    profileState.rules.forEach((rule) => { if (rule.profile === old) rule.profile = next; });
-  }
-  pr.name = next;
-  pr.original = next;
+  // Kept only as a compatibility-free marker: names are rewritten in buildProfilesPayload().
+  pr.original = pr.original || pr.name.trim();
 }
-function profilesChanged() { $("profilesDirty").hidden = JSON.stringify(profilesPayload()) === profileState.snapshot; }
+function profilesChanged() {
+  const built = buildProfilesPayload();
+  $("profilesDirty").hidden = !built.problems.length && JSON.stringify(built.payload) === profileState.snapshot;
+}
 
 function countFor(pr) { return pr.all ? tools.length : tools.filter((t) => pr.picked.has(t.name) || pr.extra.some((x) => globMatch(x, t.name))).length; }
 
 function renderProfiles() {
   const s = profileState, names = s.profiles.map((p) => p.name).filter(Boolean);
-  $("activeProfile").innerHTML = `<option value="auto" ${s.active === "auto" ? "selected" : ""}>Automatic (switch by app)</option>`
+  const missingActive = s.active !== "auto" && !names.includes(s.active)
+    ? `<option value="${esc(s.active)}" selected>Always “${esc(s.active)}” (missing)</option>` : "";
+  $("activeProfile").innerHTML = `<option value="auto" ${s.active === "auto" ? "selected" : ""}>Automatic (switch by app)</option>${missingActive}`
     + names.map((n) => `<option value="${esc(n)}" ${s.active === n ? "selected" : ""}>Always “${esc(n)}”</option>`).join("");
   $("currentProfile").textContent = `In use right now: ${s.current}`;
   $("profileCards").innerHTML = s.profiles.map((pr, i) => {
@@ -1584,11 +1597,7 @@ function renderProfiles() {
   $("profileCards").querySelectorAll(".panel").forEach((card) => {
     const pr = s.profiles[card.dataset.i];
     card.querySelector(".pr-name").addEventListener("input", (e) => { pr.name = e.target.value; profilesChanged(); });
-     card.querySelector(".pr-name").addEventListener("change", (e) => {
-       pr.name = e.target.value;
-       commitProfileRename(pr);
-       renderProfiles(); profilesChanged();
-     });
+     card.querySelector(".pr-name").addEventListener("change", (e) => { pr.name = e.target.value; renderProfiles(); profilesChanged(); });
     card.querySelector(".pr-all").addEventListener("change", (e) => { pr.all = e.target.checked; if (!pr.all && !pr.picked.size) tools.forEach((t) => pr.picked.add(t.name)); renderProfiles(); profilesChanged(); });
     card.querySelectorAll("[data-pick]").forEach((cb) => cb.addEventListener("change", () => {
       if (cb.checked) pr.picked.add(cb.dataset.pick); else pr.picked.delete(cb.dataset.pick);
@@ -1598,9 +1607,9 @@ function renderProfiles() {
     const del = card.querySelector(".pr-del");
     if (del) del.addEventListener("click", () => { if (confirm(`Delete the profile “${pr.name}”?`)) { s.profiles.splice(card.dataset.i, 1); renderProfiles(); profilesChanged(); } });
   });
-  $("ruleRows").innerHTML = s.rules.length ? s.rules.map((r, i) => `<div class="kv-row" data-i="${i}">
-      <span class="small muted">When</span><input type="text" class="ru-proc mono" value="${esc(r.process)}" placeholder="Code.exe" style="max-width:200px">
-      <span class="small muted">is in front, use</span><select class="ru-prof" style="max-width:200px">${names.map((n) => `<option ${n === r.profile ? "selected" : ""}>${esc(n)}</option>`).join("")}</select>
+   $("ruleRows").innerHTML = s.rules.length ? s.rules.map((r, i) => `<div class="kv-row" data-i="${i}">
+       <span class="small muted">When</span><input type="text" class="ru-proc mono" value="${esc(r.process)}" placeholder="Code.exe" style="max-width:200px">
+       <span class="small muted">is in front, use</span><select class="ru-prof" style="max-width:200px">${(!names.includes(r.profile) ? `<option selected disabled>${esc(r.profile)} (missing)</option>` : "")}${names.map((n) => `<option ${n === r.profile ? "selected" : ""}>${esc(n)}</option>`).join("")}</select>
       <button class="icon-btn ru-del" title="Remove">✕</button></div>`).join("") : `<div class="muted small" style="margin-bottom:8px">No rules yet.</div>`;
   $("ruleRows").querySelectorAll(".kv-row").forEach((row) => {
     const r = s.rules[row.dataset.i];
@@ -1614,7 +1623,9 @@ $("activeProfile").addEventListener("change", (e) => { profileState.active = e.t
 $("addProfile").addEventListener("click", () => { profileState.profiles.push({name: "", all: false, picked: new Set(), extra: []}); renderProfiles(); profilesChanged(); });
 $("addRule").addEventListener("click", () => { profileState.rules.push({process: "", profile: profileState.profiles[0].name}); renderProfiles(); profilesChanged(); });
 $("saveProfiles").addEventListener("click", async () => {
-  const payload = profilesPayload();
+  const built = buildProfilesPayload();
+  if (built.problems.length) return toast(built.problems.join("; "), true);
+  const payload = built.payload;
   if (!Object.keys(payload.profiles).length) return toast("Keep at least one profile", true);
   try { await api("PUT", "/v1/profiles", payload); toast("Profiles saved"); loadProfiles(); }
   catch (e) { toast(e.message, true); }
