@@ -263,7 +263,9 @@ class Engine:
             outcome, message = "dry_run", f"Would run {summarize(calls)}"
         elif any(getattr(self.registry.get(c["name"]), "safety", "run") == "confirm" for c in calls):
             outcome = "needs_confirm"
-            message = f"Say 'yes' or confirm from the tray within {self.config['confirm_seconds']} s: {summarize(calls)}"
+            approval = "confirm from the tray or tool editor" if source.startswith("program:") \
+                else "say 'yes' or confirm from the tray"
+            message = f"{approval} within {self.config['confirm_seconds']} s: {summarize(calls)}"
         else:
             outcome, message = "executed", self._execute(calls)
         entry = self.history.add(text=text, source=source, profile=profile, tools=[t.name for t in active],

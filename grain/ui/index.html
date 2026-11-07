@@ -1529,7 +1529,7 @@ async function loadProfiles() {
   profileState = {
     active: p.active_profile, current: p.current,
      profiles: Object.entries(p.profiles).map(([name, patterns]) => ({
-      name, all: patterns.includes("*"),
+      name, original: name, all: patterns.includes("*"),
       picked: new Set(tools.filter((t) => patterns.some((pat) => pat === t.name)).map((t) => t.name)),
       extra: patterns.filter((pat) => pat !== "*" && !tools.some((t) => t.name === pat)),
     })),
@@ -1540,12 +1540,23 @@ async function loadProfiles() {
 }
 
 function profilesPayload() {
+  for (const pr of profileState.profiles) commitProfileRename(pr);
   const profiles = {};
   for (const pr of profileState.profiles) {
     if (!pr.name.trim()) continue;
     profiles[pr.name.trim()] = pr.all ? ["*"] : [...pr.picked, ...pr.extra];
   }
   return {profiles, profile_rules: profileState.rules.filter((r) => r.process.trim()), active_profile: profileState.active};
+}
+function commitProfileRename(pr) {
+  const old = pr.original;
+  const next = pr.name.trim();
+  if (old && next && old !== next) {
+    if (profileState.active === old) profileState.active = next;
+    profileState.rules.forEach((rule) => { if (rule.profile === old) rule.profile = next; });
+  }
+  pr.name = next;
+  pr.original = next;
 }
 function profilesChanged() { $("profilesDirty").hidden = JSON.stringify(profilesPayload()) === profileState.snapshot; }
 
@@ -1574,10 +1585,8 @@ function renderProfiles() {
     const pr = s.profiles[card.dataset.i];
     card.querySelector(".pr-name").addEventListener("input", (e) => { pr.name = e.target.value; profilesChanged(); });
      card.querySelector(".pr-name").addEventListener("change", (e) => {
-       const old = pr.name, next = e.target.value.trim();
-       pr.name = next;
-       if (profileState.active === old) profileState.active = next;
-       profileState.rules.forEach((rule) => { if (rule.profile === old) rule.profile = next; });
+       pr.name = e.target.value;
+       commitProfileRename(pr);
        renderProfiles(); profilesChanged();
      });
     card.querySelector(".pr-all").addEventListener("change", (e) => { pr.all = e.target.checked; if (!pr.all && !pr.picked.size) tools.forEach((t) => pr.picked.add(t.name)); renderProfiles(); profilesChanged(); });

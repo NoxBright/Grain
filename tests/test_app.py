@@ -209,6 +209,22 @@ class Api(unittest.TestCase):
         profiles["profile_rules"] = [{"process": None, "profile": profiles["profiles"].keys().__iter__().__next__()}]
         self.assertEqual(self.call("PUT", "/v1/profiles", profiles)[0], 400)
 
+    def test_renaming_tool_cannot_overwrite_another_file(self):
+        base = {"description": "A test tool.", "parameters": {},
+                "action": {"type": "open", "target": "https://example.com"}}
+        self.assertEqual(self.call("PUT", "/v1/tool_files/collision_a", dict(base, name="collision_a"))[0], 200)
+        self.assertEqual(self.call("PUT", "/v1/tool_files/collision_b", dict(base, name="collision_b"))[0], 200)
+        self.assertEqual(self.call("PUT", "/v1/tool_files/collision_a", dict(base, name="collision_b"))[0], 409)
+        self.call("DELETE", "/v1/tool_files/collision_a")
+        self.call("DELETE", "/v1/tool_files/collision_b")
+
+    def test_remote_tool_schema_rejects_html_type(self):
+        key = self.make_key("schema_robot")["key"]
+        bad = [{"name": "schema_robot_tool", "description": "A tool.",
+                "parameters": {"type": "object", "properties": {
+                    "x": {"type": "<img src=x onerror=alert(1)>"}}}}]
+        self.assertEqual(self.call("POST", "/v1/tools", {"callback": "http://127.0.0.1:9/", "tools": bad}, token=key)[0], 400)
+
     # ------------------------------------------------------------ program keys
 
     def make_key(self, client):
