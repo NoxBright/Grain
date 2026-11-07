@@ -1536,14 +1536,18 @@ async function loadProfiles() {
   loadStatus();
   tools = (await api("GET", "/v1/tools")).tools;
   const p = await api("GET", "/v1/profiles");
+  // Rules and the active choice hold the profile objects themselves, so renaming a profile can never
+  // detach them; names are only resolved when the payload is built. A name with no profile stays a string.
+  const profiles = Object.entries(p.profiles).map(([name, patterns]) => ({
+    name, all: patterns.includes("*"),
+    picked: new Set(tools.filter((t) => patterns.some((pat) => pat === t.name)).map((t) => t.name)),
+    extra: patterns.filter((pat) => pat !== "*" && !tools.some((t) => t.name === pat)),
+  }));
+  const byName = (name) => profiles.find((pr) => pr.name === name) || name;
   profileState = {
-    active: p.active_profile, current: p.current,
-     profiles: Object.entries(p.profiles).map(([name, patterns]) => ({
-      name, original: name, all: patterns.includes("*"),
-      picked: new Set(tools.filter((t) => patterns.some((pat) => pat === t.name)).map((t) => t.name)),
-      extra: patterns.filter((pat) => pat !== "*" && !tools.some((t) => t.name === pat)),
-    })),
-    rules: p.profile_rules.map((r) => ({...r})),
+    active: p.active_profile === "auto" ? "auto" : byName(p.active_profile), current: p.current,
+    profiles,
+    rules: p.profile_rules.map((r) => ({...r, profile: byName(r.profile)})),
   };
   profileState.snapshot = JSON.stringify(profilesPayload());
   renderProfiles();
@@ -1553,28 +1557,26 @@ function profilesPayload() {
   const built = buildProfilesPayload();
   return built.payload;
 }
+// A rule or the active choice refers to a profile object, or holds a plain name when no profile has it.
+const profileName = (ref) => typeof ref === "string" ? ref : ref.name.trim();
+const profileExists = (ref) => profileState.profiles.includes(ref) && !!ref.name.trim();
 function buildProfilesPayload() {
   const profiles = {};
-  const originalToName = new Map();
   const problems = [];
   for (const pr of profileState.profiles) {
-    const name = pr.name.trim(), original = pr.original || pr.name.trim();
+    const name = pr.name.trim();
     if (!name) { problems.push("Profile names cannot be empty"); continue; }
     if (profiles[name]) { problems.push(`Profile name “${name}” is used more than once`); continue; }
     profiles[name] = pr.all ? ["*"] : [...pr.picked, ...pr.extra];
-    if (original) originalToName.set(original, name);
   }
-  const rewrite = (name) => originalToName.get(name) || name;
   const rules = profileState.rules.filter((r) => typeof r.process === "string" && r.process.trim())
-    .map((r) => ({...r, profile: rewrite(r.profile)}));
-  rules.forEach((r) => { if (!profiles[r.profile]) problems.push(`A rule points to missing profile “${r.profile}”`); });
-  const active = profileState.active === "auto" ? "auto" : rewrite(profileState.active);
-  if (active !== "auto" && !profiles[active]) problems.push(`The active profile “${active}” no longer exists`);
+    .map((r) => {
+      if (!profileExists(r.profile)) problems.push(`A rule points to missing profile “${profileName(r.profile)}”`);
+      return {...r, profile: profileName(r.profile)};
+    });
+  const active = profileState.active === "auto" ? "auto" : profileName(profileState.active);
+  if (active !== "auto" && !profileExists(profileState.active)) problems.push(`The active profile “${active}” no longer exists`);
   return {payload: {profiles, profile_rules: rules, active_profile: active}, problems: [...new Set(problems)]};
-}
-function commitProfileRename(pr) {
-  // Kept only as a compatibility-free marker: names are rewritten in buildProfilesPayload().
-  pr.original = pr.original || pr.name.trim();
 }
 function profilesChanged() {
   const built = buildProfilesPayload();
@@ -1584,11 +1586,12 @@ function profilesChanged() {
 function countFor(pr) { return pr.all ? tools.length : tools.filter((t) => pr.picked.has(t.name) || pr.extra.some((x) => globMatch(x, t.name))).length; }
 
 function renderProfiles() {
-  const s = profileState, names = s.profiles.map((p) => p.name).filter(Boolean);
-  const missingActive = s.active !== "auto" && !names.includes(s.active)
-    ? `<option value="${esc(s.active)}" selected>Always “${esc(s.active)}” (missing)</option>` : "";
-  $("activeProfile").innerHTML = `<option value="auto" ${s.active === "auto" ? "selected" : ""}>Automatic (switch by app)</option>${missingActive}`
-    + names.map((n) => `<option value="${esc(n)}" ${s.active === n ? "selected" : ""}>Always “${esc(n)}”</option>`).join("");
+  // Options carry the profile's index, so two profiles briefly sharing a name while one is renamed stay apart.
+  const s = profileState, named = s.profiles.map((pr, i) => [pr, i]).filter(([pr]) => pr.name.trim());
+  const missing = (ref, label) => profileExists(ref) ? "" : `<option value="" selected disabled>${label(esc(profileName(ref)))} (missing)</option>`;
+  $("activeProfile").innerHTML = `<option value="auto" ${s.active === "auto" ? "selected" : ""}>Automatic (switch by app)</option>`
+    + (s.active === "auto" ? "" : missing(s.active, (n) => `Always “${n}”`))
+    + named.map(([pr, i]) => `<option value="${i}" ${s.active === pr ? "selected" : ""}>Always “${esc(pr.name.trim())}”</option>`).join("");
   $("currentProfile").textContent = `In use right now: ${s.current}`;
   $("profileCards").innerHTML = s.profiles.map((pr, i) => {
     const n = countFor(pr);
@@ -1607,7 +1610,7 @@ function renderProfiles() {
   $("profileCards").querySelectorAll(".panel").forEach((card) => {
     const pr = s.profiles[card.dataset.i];
     card.querySelector(".pr-name").addEventListener("input", (e) => { pr.name = e.target.value; profilesChanged(); });
-     card.querySelector(".pr-name").addEventListener("change", (e) => { pr.name = e.target.value; renderProfiles(); profilesChanged(); });
+    card.querySelector(".pr-name").addEventListener("change", (e) => { pr.name = e.target.value; renderProfiles(); });
     card.querySelector(".pr-all").addEventListener("change", (e) => { pr.all = e.target.checked; if (!pr.all && !pr.picked.size) tools.forEach((t) => pr.picked.add(t.name)); renderProfiles(); profilesChanged(); });
     card.querySelectorAll("[data-pick]").forEach((cb) => cb.addEventListener("change", () => {
       if (cb.checked) pr.picked.add(cb.dataset.pick); else pr.picked.delete(cb.dataset.pick);
@@ -1617,21 +1620,25 @@ function renderProfiles() {
     const del = card.querySelector(".pr-del");
     if (del) del.addEventListener("click", () => { if (confirm(`Delete the profile “${pr.name}”?`)) { s.profiles.splice(card.dataset.i, 1); renderProfiles(); profilesChanged(); } });
   });
-   $("ruleRows").innerHTML = s.rules.length ? s.rules.map((r, i) => `<div class="kv-row" data-i="${i}">
-       <span class="small muted">When</span><input type="text" class="ru-proc mono" value="${esc(r.process)}" placeholder="Code.exe" style="max-width:200px">
-       <span class="small muted">is in front, use</span><select class="ru-prof" style="max-width:200px">${(!names.includes(r.profile) ? `<option selected disabled>${esc(r.profile)} (missing)</option>` : "")}${names.map((n) => `<option ${n === r.profile ? "selected" : ""}>${esc(n)}</option>`).join("")}</select>
+  $("ruleRows").innerHTML = s.rules.length ? s.rules.map((r, i) => `<div class="kv-row" data-i="${i}">
+      <span class="small muted">When</span><input type="text" class="ru-proc mono" value="${esc(r.process)}" placeholder="Code.exe" style="max-width:200px">
+      <span class="small muted">is in front, use</span><select class="ru-prof" style="max-width:200px">${missing(r.profile, (n) => n)}${named.map(([pr, j]) => `<option value="${j}" ${pr === r.profile ? "selected" : ""}>${esc(pr.name.trim())}</option>`).join("")}</select>
       <button class="icon-btn ru-del" title="Remove">✕</button></div>`).join("") : `<div class="muted small" style="margin-bottom:8px">No rules yet.</div>`;
   $("ruleRows").querySelectorAll(".kv-row").forEach((row) => {
     const r = s.rules[row.dataset.i];
     row.querySelector(".ru-proc").addEventListener("input", (e) => { r.process = e.target.value; profilesChanged(); });
-    row.querySelector(".ru-prof").addEventListener("change", (e) => { r.profile = e.target.value; profilesChanged(); });
+    row.querySelector(".ru-prof").addEventListener("change", (e) => { if (e.target.value !== "") r.profile = s.profiles[e.target.value]; profilesChanged(); });
     row.querySelector(".ru-del").addEventListener("click", () => { s.rules.splice(row.dataset.i, 1); renderProfiles(); profilesChanged(); });
   });
   profilesChanged();
 }
-$("activeProfile").addEventListener("change", (e) => { profileState.active = e.target.value; profilesChanged(); });
+$("activeProfile").addEventListener("change", (e) => {
+  const value = e.target.value;
+  if (value !== "") profileState.active = value === "auto" ? "auto" : profileState.profiles[value];
+  profilesChanged();
+});
 $("addProfile").addEventListener("click", () => { profileState.profiles.push({name: "", all: false, picked: new Set(), extra: []}); renderProfiles(); profilesChanged(); });
-$("addRule").addEventListener("click", () => { profileState.rules.push({process: "", profile: profileState.profiles[0].name}); renderProfiles(); profilesChanged(); });
+$("addRule").addEventListener("click", () => { profileState.rules.push({process: "", profile: profileState.profiles[0]}); renderProfiles(); profilesChanged(); });
 $("saveProfiles").addEventListener("click", async () => {
   const built = buildProfilesPayload();
   if (built.problems.length) return toast(built.problems.join("; "), true);
