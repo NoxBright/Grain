@@ -26,14 +26,7 @@ jobs:
 
       - name: Download official model files
         shell: pwsh
-        run: |
-          @'
-          from huggingface_hub import hf_hub_download
-
-          for repo, filename in (("Cactus-Compute/needle3", "needle3.cact"),
-                                 ("Cactus-Compute/whistle", "whistle.cact")):
-              hf_hub_download(repo_id=repo, filename=filename, local_dir="models")
-          '@ | python -
+        run: python dev/fetch_models.py  # pinned commits, SHA-256 checked
 
       - name: Run tests
         shell: pwsh
@@ -59,14 +52,7 @@ jobs:
 
       - name: Download official model files
         shell: pwsh
-        run: |
-          @'
-          from huggingface_hub import hf_hub_download
-
-          for repo, filename in (("Cactus-Compute/needle3", "needle3.cact"),
-                                 ("Cactus-Compute/whistle", "whistle.cact")):
-              hf_hub_download(repo_id=repo, filename=filename, local_dir="models")
-          '@ | python -
+        run: python dev/fetch_models.py  # pinned commits, SHA-256 checked
 
       - name: Warm and verify the native Needle engine
         shell: pwsh

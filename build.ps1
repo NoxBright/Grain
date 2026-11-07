@@ -25,6 +25,10 @@ if (-not (Test-Path $engine)) {
     throw "Needle native engine not found at $engine. Add vendor\windows\libneedle.dll or install a matching cactus-needle engine cache before building."
 }
 
+# Only the pinned model files may ship (see dev\fetch_models.py; run it without --check to fetch them).
+& $py dev\fetch_models.py --check
+if ($LASTEXITCODE -ne 0) { throw "The model files in models\ are missing or aren't the pinned versions. Run: python dev\fetch_models.py" }
+
 Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
 if (Test-Path dist) {
     # Something still has files open (usually Grain App running from dist\Grain). Building over it would
