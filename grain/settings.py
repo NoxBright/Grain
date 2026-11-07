@@ -141,6 +141,10 @@ def check_for_update(config, timeout=8):
         manifest = json.loads(response.read(65536))
     latest = str(manifest.get("version", ""))
     newer = _version_tuple(latest) > _version_tuple(__version__)
-    return {"available": newer, "current": __version__, "latest": latest, "url": manifest.get("url", ""),
+    try:
+        download = _url(manifest.get("url", "")) if isinstance(manifest.get("url", ""), str) else ""
+    except ValueError:
+        download = ""  # the page links to this, so never pass on javascript: or other schemes
+    return {"available": newer, "current": __version__, "latest": latest, "url": download,
             "notes": str(manifest.get("notes", ""))[:500],
             "message": f"Grain {latest} is available." if newer else f"Grain {__version__} is up to date."}

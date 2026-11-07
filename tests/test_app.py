@@ -225,6 +225,14 @@ class Api(unittest.TestCase):
                     "x": {"type": "<img src=x onerror=alert(1)>"}}}}]
         self.assertEqual(self.call("POST", "/v1/tools", {"callback": "http://127.0.0.1:9/", "tools": bad}, token=key)[0], 400)
 
+    def test_remote_tool_phrases_and_keywords_must_be_text(self):
+        key = self.make_key("phrase_robot")["key"]
+        base = {"name": "phrase_robot_tool", "description": "A tool."}
+        for bad in ({"phrases": [None]}, {"phrases": [{"say": 5}]}, {"phrases": [{"say": "go", "arguments": []}]},
+                    {"keywords": [None]}):
+            body = {"callback": "http://127.0.0.1:9/", "tools": [dict(base, **bad)]}
+            self.assertEqual(self.call("POST", "/v1/tools", body, token=key)[0], 400, bad)
+
     # ------------------------------------------------------------ program keys
 
     def make_key(self, client):
@@ -366,6 +374,12 @@ class Updates(unittest.TestCase):
         result = settings.check_for_update({"update_url": url})
         self.assertTrue(result["available"])
         self.assertEqual(result["latest"], "9.0.0")
+
+    def test_download_link_must_be_a_web_address(self):
+        url = self.serve_manifest({"version": "9.0.0", "url": "javascript:alert(1)"})
+        result = settings.check_for_update({"update_url": url})
+        self.assertTrue(result["available"])
+        self.assertEqual(result["url"], "")
 
     def test_same_version_is_up_to_date(self):
         url = self.serve_manifest({"version": __version__})

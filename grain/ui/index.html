@@ -831,10 +831,10 @@ function toast(message, bad) {
   const t = $("toast"); t.textContent = message; t.className = "toast show" + (bad ? " bad" : "");
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.className = "toast"; }, 3200);
 }
-const fmtArgs = (args) => Object.entries(args || {}).map(([k, v]) => `${k}: ${typeof v === "string" ? `"${v}"` : v}`).join(", ");
+const fmtArgs = (args) => Object.entries(args || {}).map(([k, v]) => `${k}: ${typeof v === "string" ? `"${v}"` : v !== null && typeof v === "object" ? JSON.stringify(v) : v}`).join(", ");
 const fmtCall = (c) => `${c.name.replace(/_/g, " ")}${Object.keys(c.arguments || {}).length ? ` (${fmtArgs(c.arguments)})` : ""}`;
 const fmtCalls = (calls) => calls && calls.length ? calls.map(fmtCall).join(" + ") : "nothing";
-const phraseText = (p) => typeof p === "string" ? p : (p.say || "");
+const phraseText = (p) => typeof p === "string" ? p : p && typeof p.say === "string" ? p.say : "";
 const placeholders = (s) => [...String(s).matchAll(/\{(\w+)\}/g)].map((m) => m[1]);
 const highlight = (s) => esc(s).replace(/\{(\w+)\}/g, '<span class="ph">{$1}</span>');
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").replace(/^(\d)/, "t_$1").slice(0, 64);
@@ -1084,7 +1084,7 @@ function renderPhrases() {
   const d = editor.data, ro = editor.readOnly;
   $("phraseRows").innerHTML = d.phrases.length ? d.phrases.map((p, i) => {
     if (typeof p !== "string") {
-      return `<div class="phrase-row"><div class="grow note small">“${esc(p.say)}” <span class="muted">→ always uses ${esc(fmtArgs(p.arguments))}</span></div>
+      return `<div class="phrase-row"><div class="grow note small">“${esc(phraseText(p))}” <span class="muted">→ always uses ${esc(fmtArgs(p && p.arguments))}</span></div>
         ${ro ? "" : `<button class="icon-btn" data-del-phrase="${i}" title="Remove">✕</button>`}</div>`;
     }
     return ro ? `<div class="phrase-row"><div class="grow note mono small">${highlight(p)}</div></div>`
@@ -1115,7 +1115,7 @@ function syncParamsFromPhrases() {
 
 function isUsed(name) {
   const d = editor.data;
-  const inPhrases = d.phrases.some((p) => typeof p === "string" ? placeholders(p).includes(name) : p.arguments && name in p.arguments);
+  const inPhrases = d.phrases.some((p) => typeof p === "string" ? placeholders(p).includes(name) : p && p.arguments && name in p.arguments);
   return inPhrases || JSON.stringify(d.action || {}).includes(`{${name}}`);
 }
 
@@ -1416,14 +1416,18 @@ async function loadPending() {
     : `<div class="muted small">Nothing is waiting.</div>`;
   $("pendingList").querySelectorAll("button").forEach((b) => b.addEventListener("click", async () => {
     const id = b.dataset.confirm || b.dataset.cancel;
-    const data = await api("POST", `/v1/pending/${id}/${b.dataset.confirm ? "confirm" : "cancel"}`);
-    $("tryResults").innerHTML = data.results.map(resultCard).join(""); loadPending(); loadStatus();
+    try {
+      const data = await api("POST", `/v1/pending/${id}/${b.dataset.confirm ? "confirm" : "cancel"}`);
+      $("tryResults").innerHTML = data.results.map(resultCard).join("");
+    } catch (e) { toast(e.message, true); }
+    loadPending().catch(() => {}); loadStatus();
   }));
 }
 
 // ================================================================ HISTORY
 let historyEntries = [], histFilter = "review";
 const reviewable = (e) => e.correction == null && !["nothing_pending"].includes(e.outcome);
+function showReviewCount() { const n = historyEntries.filter(reviewable).length; $("reviewCount").hidden = !n; $("reviewCount").textContent = n; }
 document.querySelectorAll("#histFilters button").forEach((b) => b.addEventListener("click", () => {
   histFilter = b.dataset.f; document.querySelectorAll("#histFilters button").forEach((x) => x.classList.toggle("on", x === b)); renderHistory();
 }));
@@ -1504,7 +1508,13 @@ function openFix(slot, entry) {
 }
 
 async function correct(entry, calls) {
-  try { await api("POST", `/v1/history/${entry.id}/correction`, {calls}); entry.correction = calls; toast("Thanks, noted"); renderHistory(); }
+  try {
+    await api("POST", `/v1/history/${entry.id}/correction`, {calls});
+    entry.correction = calls;
+    const current = historyEntries.find((x) => x.id === entry.id);  // the list may have been refreshed since the form opened
+    if (current) current.correction = calls;
+    toast("Thanks, noted"); renderHistory();
+  }
   catch (e) { toast(e.message, true); }
 }
 
@@ -1906,8 +1916,11 @@ async function watchEvents() {
       seq = data.seq;
       if (data.events.length) {
         loadStatus();
-        if (currentTab === "history") { historyEntries = (await api("GET", "/v1/history?limit=300")).entries; renderHistory(); }
-        else api("GET", "/v1/history?limit=300").then((h) => { historyEntries = h.entries; const n = historyEntries.filter(reviewable).length; $("reviewCount").hidden = !n; $("reviewCount").textContent = n; });
+        if (currentTab === "history") {
+          historyEntries = (await api("GET", "/v1/history?limit=300")).entries;
+          // Re-rendering would throw away a correction the user is filling in; it refreshes once they finish.
+          if ($("histList").querySelector(".fix-slot .fix")) showReviewCount(); else renderHistory();
+        } else api("GET", "/v1/history?limit=300").then((h) => { historyEntries = h.entries; showReviewCount(); });
         if (currentTab === "try") loadPending();
       }
     } catch (e) { await new Promise((r) => setTimeout(r, 5000)); }
@@ -1922,7 +1935,7 @@ else {
     else if (startTab === "model-setup") switchTab("guide");
     else if (startTab && startTab !== "tools" && document.getElementById(startTab)) switchTab(startTab);
   }).catch((e) => toast(e.message, true));
-  api("GET", "/v1/history?limit=300").then((h) => { historyEntries = h.entries; const n = historyEntries.filter(reviewable).length; $("reviewCount").hidden = !n; $("reviewCount").textContent = n; }).catch(() => {});
+  api("GET", "/v1/history?limit=300").then((h) => { historyEntries = h.entries; showReviewCount(); }).catch(() => {});
   watchEvents();
 }
 </script>

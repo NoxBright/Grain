@@ -45,6 +45,14 @@ def remote_tools(client, callback, specs):
         for key in ("keywords", "phrases"):
             if key in spec and not isinstance(spec[key], list):
                 raise ValueError(f"{name}: {key} must be a list")
+        if not all(isinstance(word, str) for word in spec.get("keywords", [])):
+            raise ValueError(f"{name}: keywords must be strings")
+        for phrase in spec.get("phrases", []):
+            if isinstance(phrase, str):
+                continue
+            if not isinstance(phrase, dict) or not isinstance(phrase.get("say"), str) \
+                    or not isinstance(phrase.get("arguments", {}), dict):
+                raise ValueError(f"{name}: each phrase must be text or {{say: text, arguments: {{...}}}}")
         parameters = to_schema(spec.get("parameters", {}))
         if not isinstance(parameters, dict) or parameters.get("type") != "object":
             raise ValueError(f"{name}: parameters must be an object schema")
