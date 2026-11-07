@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grain: an offline voice assistant for Windows</title>
+<meta name="description" content="Grain is a voice assistant for Windows that runs entirely on your PC. Speech recognition and the AI that picks what to do both run locally on the CPU.">
+<meta property="og:title" content="Grain: an offline voice assistant for Windows">
+<meta property="og:description" content="Press a hotkey, say what you want, and Grain does it. Nothing you say leaves your computer.">
+<meta property="og:image" content="grain.png">
+<link rel="icon" href="grain.png">
+<style>
+:root {
+  --bg: #f5f4ef; --panel: #ffffff; --raised: #fbfaf7; --text: #1d2125; --muted: #5d646c; --faint: #858b93;
+  --line: #e3e1d8; --accent: #a87a06; --accent-strong: #8a6404; --accent-soft: #f6ecd2; --accent-text: #ffffff;
+  --ok: #23804f; --ok-soft: #e1f2e8; --warn: #a3620a; --warn-soft: #fbefd9; --chip: #efede6;
+  --code-bg: #1c1a17; --code-text: #ece6d8; --code-key: #e3b341; --code-str: #9fd39b; --code-dim: #8d877b;
+  --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 28px rgba(60,45,10,.07);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #08050d; --panel: #17181b; --raised: #1e2023; --text: #e9e7e2; --muted: #a0a6ad; --faint: #7d838a;
+    --line: #2c2f34; --accent: #e3b341; --accent-strong: #f0c45a; --accent-soft: #2e2719; --accent-text: #1a1a1a;
+    --ok: #51c48a; --ok-soft: #1d3428; --warn: #f0ae4c; --warn-soft: #3a2f1c; --chip: #24262a;
+    --code-bg: #111113; --shadow: none; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #08050d; --panel: #17181b; --raised: #1e2023; --text: #e9e7e2; --muted: #a0a6ad; --faint: #7d838a;
+  --line: #2c2f34; --accent: #e3b341; --accent-strong: #f0c45a; --accent-soft: #2e2719; --accent-text: #1a1a1a;
+  --ok: #51c48a; --ok-soft: #1d3428; --warn: #f0ae4c; --warn-soft: #3a2f1c; --chip: #24262a;
+  --code-bg: #111113; --shadow: none; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { background: var(--bg); scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 "Segoe UI", system-ui, -apple-system, sans-serif; }
+#sand { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; image-rendering: pixelated; }
+.page { position: relative; z-index: 1; }
+a { color: var(--accent); }
+code, pre, .mono { font-family: Consolas, "Cascadia Mono", ui-monospace, monospace; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+@media (max-width: 560px) { .wrap { padding: 0 16px; } }
+
+/* header */
+header { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+header .wrap { display: flex; align-items: center; gap: 20px; height: 60px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; color: var(--text); text-decoration: none; }
+.brand img { width: 24px; height: 24px; image-rendering: pixelated; }
+header nav { display: flex; gap: 22px; margin-left: auto; font-size: 14.5px; }
+header nav a { color: var(--muted); text-decoration: none; }
+header nav a:hover { color: var(--text); }
+.gh { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 600; color: var(--text); text-decoration: none;
+  border: 1px solid var(--line); background: var(--panel); padding: 6px 12px; border-radius: 8px; }
+.gh:hover { border-color: var(--faint); }
+.gh svg { width: 16px; height: 16px; fill: currentColor; }
+@media (max-width: 760px) { header nav { display: none; } .gh { margin-left: auto; } }
+
+/* buttons */
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 20px; border-radius: 10px; font-weight: 600; font-size: 15.5px;
+  text-decoration: none; border: 1px solid var(--line); background: var(--panel); color: var(--text); transition: transform .12s, border-color .12s; }
+.btn:hover { border-color: var(--faint); transform: translateY(-1px); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.btn.primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+.btn svg { width: 18px; height: 18px; fill: currentColor; }
+
+/* hero */
+.hero { padding-top: 84px; padding-bottom: 72px; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 56px; align-items: center; }
+.eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--accent);
+  background: var(--accent-soft); padding: 4px 12px; border-radius: 99px; margin-bottom: 20px; }
+.eyebrow i { width: 6px; height: 6px; background: var(--accent); display: inline-block; }
+h1 { text-wrap: balance; font-size: clamp(36px, 5vw, 56px); line-height: 1.04; letter-spacing: -0.025em; margin: 0 0 20px; font-weight: 750; }
+h1 em { font-style: normal; color: var(--accent); }
+.lede { font-size: 18.5px; color: var(--muted); margin: 0 0 30px; max-width: 34em; }
+.lede kbd, .keycap { font-family: Consolas, ui-monospace, monospace; font-size: .82em; padding: 2px 7px; border-radius: 6px;
+  border: 1px solid var(--line); border-bottom-width: 2px; background: var(--panel); color: var(--text); white-space: nowrap; }
+.ctas { display: flex; flex-wrap: wrap; gap: 12px; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 26px 0 0; padding: 0; list-style: none; font-size: 14px; color: var(--muted); }
+.facts li::before { content: "■"; color: var(--accent); font-size: 8px; vertical-align: 3px; margin-right: 8px; }
+@media (max-width: 900px) { .hero { grid-template-columns: 1fr; gap: 44px; padding-top: 56px; padding-bottom: 48px; } }
+
+/* demo card */
+.demo { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
+.demo-bar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--raised); font-size: 13px; color: var(--muted); }
+.mic { width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); display: grid; place-items: center; flex: none; }
+.mic svg { width: 14px; height: 14px; fill: var(--accent); }
+.listening .mic { animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); } 50% { box-shadow: 0 0 0 7px transparent; } }
+.wave { display: flex; gap: 3px; align-items: center; height: 16px; margin-left: auto; }
+.wave i { width: 3px; height: 4px; background: var(--accent); opacity: .35; }
+.listening .wave i { animation: wave .9s ease-in-out infinite; opacity: .9; }
+.wave i:nth-child(2) { animation-delay: .1s; } .wave i:nth-child(3) { animation-delay: .2s; } .wave i:nth-child(4) { animation-delay: .3s; } .wave i:nth-child(5) { animation-delay: .4s; }
+@keyframes wave { 0%, 100% { height: 4px; } 50% { height: 15px; } }
+.demo-body { padding: 22px 20px 20px; min-height: 252px; }
+.said { font-size: 21px; font-weight: 600; line-height: 1.35; min-height: 58px; margin: 0 0 18px; }
+.said .caret { display: inline-block; width: 2px; height: 1.05em; background: var(--accent); vertical-align: -3px; margin-left: 2px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.steps { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.steps li { display: flex; align-items: baseline; gap: 10px; font-size: 14px; padding: 8px 12px; border-radius: 9px; background: var(--raised);
+  border: 1px solid var(--line); opacity: 0; transform: translateY(4px); transition: opacity .3s, transform .3s; }
+.steps li.on { opacity: 1; transform: none; }
+.steps .k { color: var(--faint); width: 74px; flex: none; font-size: 12.5px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.steps .v { min-width: 0; overflow-wrap: anywhere; }
+.steps code { font-size: 13.5px; color: var(--text); }
+.chip { display: inline-block; font-size: 12.5px; font-weight: 600; padding: 1px 9px; border-radius: 99px; background: var(--chip); color: var(--muted); }
+.chip.ok { background: var(--ok-soft); color: var(--ok); } .chip.warn { background: var(--warn-soft); color: var(--warn); }
+@media (prefers-reduced-motion: reduce) { .listening .mic, .listening .wave i, .said .caret { animation: none; } .steps li { transition: none; } }
+
+/* sections */
+section { padding: 76px 0; }
+section + section { border-top: 1px solid var(--line); }
+.kicker { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+h2 { text-wrap: balance; font-size: clamp(28px, 3.6vw, 38px); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 14px; }
+.intro { color: var(--muted); font-size: 17.5px; max-width: 40em; margin: 0 0 40px; }
+h3 { font-size: 17px; margin: 0 0 6px; }
+
+/* flow */
+.flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
+.flow li { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px 18px 18px; box-shadow: var(--shadow); }
+.flow li::before { counter-increment: step; content: counter(step); display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px;
+  background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 14px; margin-bottom: 14px; }
+.flow p { margin: 0; color: var(--muted); font-size: 14.5px; }
+.flow b { color: var(--text); }
+@media (max-width: 900px) { .flow { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .flow { grid-template-columns: 1fr; } }
+
+/* features */
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px 20px; box-shadow: var(--shadow); }
+.card p { margin: 0; color: var(--muted); font-size: 14.5px; }
+.icon { width: 36px; height: 36px; border-radius: 10px; background: var(--accent-soft); display: grid; place-items: center; margin-bottom: 14px; }
+.icon svg { width: 18px; height: 18px; stroke: var(--accent); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+@media (max-width: 900px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
+
+/* say list */
+.say { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.say li { background: var(--panel); border: 1px solid var(--line); border-radius: 99px; padding: 8px 16px; font-size: 15px; }
+.say li::before { content: "“"; color: var(--accent); } .say li::after { content: "”"; color: var(--accent); }
+
+/* build */
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 40px; align-items: start; }
+.tabs { display: inline-flex; gap: 2px; background: var(--chip); padding: 3px; border-radius: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.tabs button { border: 0; background: none; font: inherit; font-size: 14px; padding: 6px 14px; border-radius: 8px; cursor: pointer; color: var(--muted); }
+.tabs button[aria-selected="true"] { background: var(--panel); color: var(--text); font-weight: 600; box-shadow: var(--shadow); }
+.code { background: var(--code-bg); color: var(--code-text); border-radius: 14px; padding: 18px 20px; overflow-x: auto; font-size: 13px; line-height: 1.65; margin: 0; scrollbar-color: #4a463f transparent; }
+.code .k { color: var(--code-key); } .code .s { color: var(--code-str); } .code .c { color: var(--code-dim); }
+.kinds { margin: 0; padding: 0; list-style: none; display: grid; gap: 14px; }
+.kinds li { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; }
+.kinds .n { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); display: grid; place-items: center;
+  font-weight: 700; font-size: 13px; color: var(--accent); }
+.kinds p { margin: 2px 0 0; color: var(--muted); font-size: 14.5px; }
+@media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
+
+/* privacy */
+.privacy { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.privacy .card { display: flex; gap: 14px; }
+.privacy .icon { flex: none; margin: 0; }
+@media (max-width: 760px) { .privacy { grid-template-columns: 1fr; } }
+
+/* install */
+.install { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 36px; box-shadow: var(--shadow);
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 30px; align-items: center; }
+.install ol { margin: 14px 0 0; padding-left: 22px; color: var(--muted); }
+.install ol li { margin: 4px 0; }
+.install ol b { color: var(--text); }
+.source-note { margin: 16px 0 0; font-size: 14px; color: var(--faint); }
+.source-note code { font-size: 13px; color: var(--muted); }
+@media (max-width: 760px) { .install { grid-template-columns: 1fr; padding: 24px 20px; } }
+
+footer { border-top: 1px solid var(--line); padding: 32px 0 44px; font-size: 14px; color: var(--muted); }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: center; }
+footer nav { display: flex; flex-wrap: wrap; gap: 18px; margin-left: auto; }
+footer a { color: var(--muted); }
+footer a:hover { color: var(--text); }
+.theme { border: 1px solid var(--line); background: var(--panel); color: var(--muted); border-radius: 8px; padding: 5px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="sand" aria-hidden="true"></canvas>
+<div class="page">
+
+<header>
+  <div class="wrap">
+    <a class="brand" href="#top"><img src="grain.png" alt="" width="24" height="24">Grain</a>
+    <nav aria-label="Sections">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#build">Make tools</a>
+      <a href="#privacy">Privacy</a>
+    </nav>
+    <a class="gh" href="https://github.com/NoxBright/Grain">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
+  </div>
+</header>
+
+<main id="top">
+  <div class="wrap hero">
+    <div>
+      <span class="eyebrow"><i></i>Offline voice assistant for Windows</span>
+      <h1>Talk to your PC. <em>Nothing leaves it.</em></h1>
+      <p class="lede">Press <kbd>Ctrl+Alt+Space</kbd> and say what you want. Grain turns your voice into text, picks the right action and runs it, all on your own CPU. There's no cloud and no account, and it works with the network unplugged.</p>
+      <div class="ctas">
+        <a class="btn primary" href="https://github.com/NoxBright/Grain/releases/latest">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a1 1 0 011 1v9.59l3.3-3.3a1 1 0 111.4 1.42l-5 5a1 1 0 01-1.4 0l-5-5a1 1 0 111.4-1.42l3.3 3.3V4a1 1 0 011-1zM5 19a1 1 0 100 2h14a1 1 0 100-2H5z"/></svg>
+          Download for Windows
+        </a>
+        <a class="btn" href="https://github.com/NoxBright/Grain">View the source</a>
+      </div>
+      <ul class="facts">
+        <li>Free and MIT licensed</li>
+        <li>No admin rights to install</li>
+        <li>Models bundled, CPU only</li>
+      </ul>
+    </div>
+
+    <div class="demo" id="demo" aria-label="Example: what Grain does with a spoken command">
+      <div class="demo-bar"><span class="mic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3zm5-3a5 5 0 01-10 0H5a7 7 0 006 6.92V21h2v-2.08A7 7 0 0019 12h-2z"/></svg></span>
+        <span id="demoState">Listening…</span><span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span></div>
+      <div class="demo-body">
+        <p class="said" id="demoSaid" aria-live="polite"></p>
+        <ul class="steps" id="demoSteps">
+          <li><span class="k">Matched</span><span class="v" id="dHow"></span></li>
+          <li><span class="k">Tool</span><span class="v"><code id="dCall"></code></span></li>
+          <li><span class="k">Result</span><span class="v" id="dResult"></span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <section id="how">
+    <div class="wrap">
+      <p class="kicker">How it works</p>
+      <h2>Four steps, all on this PC</h2>
+      <p class="intro">Two small models do the hard parts: <b>Whistle</b> for speech to text and <b>Needle</b> for picking a tool. Grain wraps them with exact phrase matching and safety checks, so a guess can't run something it shouldn't.</p>
+      <ol class="flow">
+        <li><h3>You speak</h3><p>Press the hotkey, or turn on the wake word. Grain stops listening when you pause.</p></li>
+        <li><h3>Whistle transcribes</h3><p>Speech becomes text locally. Requests joined with <b>“then”</b> are split into separate steps.</p></li>
+        <li><h3>A phrase or Needle picks</h3><p>Exact <b>phrases</b> are checked first. Anything else goes to Needle, which picks from the current profile's tools.</p></li>
+        <li><h3>Grain checks and runs</h3><p>Arguments are validated, confidence and safety are checked, and then the tool runs and you get a notification.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="wrap">
+      <p class="kicker">Features</p>
+      <h2>Small, private, and yours to shape</h2>
+      <p class="intro">Grain does a few things reliably instead of everything vaguely, and every part of it can be edited.</p>
+      <div class="grid">
+        <div class="card"><div class="icon"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg></div>
+          <h3>Fully offline</h3><p>Both models are inside the installer, so nothing is downloaded when Grain runs. The network libraries aren't even in the build, and the only connection is an optional update check, off by default.</p></div>
+        <div class="card"><div class="icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h7"/><path d="M17 15l2 2 3-4"/></svg></div>
+          <h3>Exact phrases first</h3><p>“search youtube for {query}” always works and keeps your exact words. The AI only guesses when no phrase matches.</p></div>
+        <div class="card"><div class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="4" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+          <h3>Profiles</h3><p>Small sets of tools for gaming, coding, media or system tasks, picked by hand or switched by the app in front. Fewer choices means better guesses.</p></div>
+        <div class="card"><div class="icon"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg></div>
+          <h3>Asks before risky things</h3><p>Each tool is <b>run</b>, <b>confirm</b> or <b>strict</b>. Scripts and programs wait for a spoken “yes”, and other programs can never approve on your behalf.</p></div>
+        <div class="card"><div class="icon"><svg viewBox="0 0 24 24"><path d="M14 4l6 6-10 10H4v-6L14 4z"/><path d="M12 6l6 6"/></svg></div>
+          <h3>Make your own commands</h3><p>The built-in tool editor builds a command from phrases and an action: open something, press keys, send a web request or run a script. You don't write any code.</p></div>
+        <div class="card"><div class="icon"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
+          <h3>Gets better with you</h3><p>Mark each command right or wrong in History, download the training data, and fine-tune Needle on your own phrasing, locally.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="try">
+    <div class="wrap">
+      <p class="kicker">Out of the box</p>
+      <h2>Try saying</h2>
+      <p class="intro">Grain comes with everyday Windows tools. “Open” works for any program in your Start menu, with no bundled product list.</p>
+      <ul class="say">
+        <li>open notepad</li><li>what time is it</li><li>search youtube for cat videos</li><li>set a timer for five minutes</li>
+        <li>volume up</li><li>next song</li><li>take a note buy milk</li><li>take a screenshot</li><li>roll two dice</li>
+        <li>open calculator then set a timer for ten minutes</li><li>lock the computer</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="build">
+    <div class="wrap split">
+      <div>
+        <p class="kicker">Make tools</p>
+        <h2>Four ways to teach it something new</h2>
+        <p class="intro" style="margin-bottom:28px">All of them go into one registry. A tool needs a name, a sentence describing it for the AI, and something to do.</p>
+        <ul class="kinds">
+          <li><span class="n">1</span><div><h3>Tool files</h3><p>A small JSON file, made in the tool editor or by hand. It reloads within seconds.</p></div></li>
+          <li><span class="n">2</span><div><h3>Python plugins</h3><p>Decorate a function with <code>@tool</code>. The docstring and type hints become what the AI reads.</p></div></li>
+          <li><span class="n">3</span><div><h3>Other programs</h3><p>A local app registers tools over the API with its own program key, and Grain calls it back when one is picked.</p></div></li>
+          <li><span class="n">4</span><div><h3>Built-ins</h3><p>Apps, volume, media, time and lock. Everything else is a plugin or file you can change or delete.</p></div></li>
+        </ul>
+      </div>
+      <div>
+        <div class="tabs" role="tablist" aria-label="Example tool">
+          <button role="tab" aria-selected="true" aria-controls="ex-json" id="t-json">Tool file</button>
+          <button role="tab" aria-selected="false" aria-controls="ex-py" id="t-py" tabindex="-1">Python plugin</button>
+          <button role="tab" aria-selected="false" aria-controls="ex-api" id="t-api" tabindex="-1">From a program</button>
+        </div>
+<pre class="code" id="ex-json" role="tabpanel" aria-labelledby="t-json">{
+  <span class="k">"name"</span>: <span class="s">"open_youtube"</span>,
+  <span class="k">"description"</span>: <span class="s">"Open YouTube, searching if a video is named."</span>,
+  <span class="k">"phrases"</span>: [
+    <span class="s">"search youtube for {query}"</span>,
+    <span class="s">"play {query} on youtube"</span>
+  ],
+  <span class="k">"parameters"</span>: {
+    <span class="k">"query"</span>: {<span class="k">"type"</span>: <span class="s">"string"</span>, <span class="k">"required"</span>: false}
+  },
+  <span class="k">"action"</span>: {
+    <span class="k">"type"</span>: <span class="s">"open"</span>,
+    <span class="k">"target"</span>: <span class="s">"https://youtube.com/results?search_query={query}"</span>
+  },
+  <span class="k">"safety"</span>: <span class="s">"run"</span>
+}</pre>
+<pre class="code" id="ex-py" role="tabpanel" aria-labelledby="t-py" hidden><span class="k">from</span> typing <span class="k">import</span> Literal
+<span class="k">from</span> grain <span class="k">import</span> tool
+
+<span class="k">@tool</span>(safety=<span class="s">"confirm"</span>, phrases=[<span class="s">"restart {name}"</span>])
+<span class="k">def</span> restart_service(name: Literal[<span class="s">"web"</span>, <span class="s">"db"</span>]):
+    <span class="s">"Restart one of the local services."</span>
+    ...
+    <span class="k">return</span> <span class="s">"restarted "</span> + name</pre>
+<pre class="code" id="ex-api" role="tabpanel" aria-labelledby="t-api" hidden><span class="c"># Your program, with a key from Settings → Program keys</span>
+POST http://127.0.0.1:8765/v1/tools
+Authorization: Bearer $GRAIN_API_KEY
+
+{
+  <span class="k">"callback"</span>: <span class="s">"http://127.0.0.1:9000/grain"</span>,
+  <span class="k">"tools"</span>: [{
+    <span class="k">"name"</span>: <span class="s">"robot_walk"</span>,
+    <span class="k">"description"</span>: <span class="s">"Walk the robot in one direction."</span>,
+    <span class="k">"phrases"</span>: [<span class="s">"walk {direction}"</span>],
+    <span class="k">"parameters"</span>: {<span class="k">"direction"</span>: {<span class="k">"type"</span>: <span class="s">"string"</span>,
+                   <span class="k">"enum"</span>: [<span class="s">"forward"</span>, <span class="s">"back"</span>, <span class="s">"left"</span>, <span class="s">"right"</span>]}}
+  }]
+}</pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="privacy">
+    <div class="wrap">
+      <p class="kicker">Privacy and safety</p>
+      <h2>Built so there's nothing to leak</h2>
+      <p class="intro">What you say is transcribed, interpreted and acted on inside your PC. Here's what that means in practice.</p>
+      <div class="privacy">
+        <div class="card"><div class="icon"><svg viewBox="0 0 24 24"><path d="M2 2l20 20"/><path d="M8.5 16.5a5 5 0 017 0M5 12.9a10 10 0 0114.1 0M12 20h.01"/></svg></div>
+          <div><h3>No network connections</h3><p>The models come in the installer and the Needle library's download check is switched off. A test loads both models with every outside connection blocked and fails if Grain tries to go online.</p></div></div>
+        <div class="card"><div class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></div>
+          <div><h3>The API is this PC only</h3><p>The local API refuses other hosts and web pages. Programs get keys of their own, limited to their own tools and results.</p></div></div>
+        <div class="card"><div class="icon"><svg viewBox="0 0 24 24"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg></div>
+          <div><h3>Your data stays in one folder</h3><p>Settings, history, notes, the log and your own tools live in <code>%APPDATA%\Grain</code>. Updating keeps them, and uninstalling keeps them unless you ask.</p></div></div>
+        <div class="card"><div class="icon"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3z"/></svg></div>
+          <div><h3>Guesses are checked</h3><p>Invented arguments are dropped and impossible values refused. A guess that shares no words with your request needs high confidence before it runs.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="wrap">
+      <div class="install">
+        <div>
+          <p class="kicker">Get started</p>
+          <h2 style="margin-bottom:4px">Up and running in about a minute</h2>
+          <ol>
+            <li>Download and run <b>Grain Setup</b>. It installs for your user only, with no admin rights.</li>
+            <li>Pick your microphone and hotkey in the short first-run setup.</li>
+            <li>Press <span class="keycap">Ctrl+Alt+Space</span> and say “open notepad”.</li>
+          </ol>
+          <p class="source-note">Building from source? The models aren't in the repository because of their size. <code>python dev/fetch_models.py</code> downloads the exact versions each release ships and checks their SHA-256.</p>
+        </div>
+        <a class="btn primary" href="https://github.com/NoxBright/Grain/releases/latest">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a1 1 0 011 1v9.59l3.3-3.3a1 1 0 111.4 1.42l-5 5a1 1 0 01-1.4 0l-5-5a1 1 0 111.4-1.42l3.3 3.3V4a1 1 0 011-1zM5 19a1 1 0 100 2h14a1 1 0 100-2H5z"/></svg>
+          Download for Windows
+        </a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Grain is MIT licensed. Needle and Whistle models by Cactus Compute, Apache-2.0.</span>
+    <nav aria-label="Project links">
+      <a href="https://github.com/NoxBright/Grain#readme">Documentation</a>
+      <a href="https://github.com/NoxBright/Grain/blob/master/CHANGELOG.md">Changelog</a>
+      <a href="https://github.com/NoxBright/Grain/blob/master/SECURITY.md">Security</a>
+      <a href="https://github.com/NoxBright/Grain/issues">Issues</a>
+      <button class="theme" id="theme" type="button">Theme: auto</button>
+    </nav>
+  </div>
+</footer>
+</div>
+
+<script>
+"use strict";
+const stillQuery = matchMedia("(prefers-reduced-motion: reduce)");
+const darkQuery = matchMedia("(prefers-color-scheme: dark)");
+
+// ---------------------------------------------------------------- theme toggle
+(function theme() {
+  const button = document.getElementById("theme"), order = ["auto", "light", "dark"];
+  let mode = "auto";
+  try { mode = localStorage.getItem("grainTheme") || "auto"; } catch (e) {}
+  const apply = () => {
+    if (mode === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = mode;
+    button.textContent = `Theme: ${mode}`;
+    window.dispatchEvent(new Event("grain-theme"));
+  };
+  button.addEventListener("click", () => {
+    mode = order[(order.indexOf(mode) + 1) % order.length];
+    try { localStorage.setItem("grainTheme", mode); } catch (e) {}
+    apply();
+  });
+  apply();
+})();
+
+// ---------------------------------------------------------------- sand background (as in the tool editor)
+(function sandBackground() {
+  const canvas = document.getElementById("sand"), ctx = canvas.getContext("2d");
+  const COUNT = 80, TRAIL = 6;
+  const posX = new Float32Array(COUNT), posY = new Float32Array(COUNT), velX = new Float32Array(COUNT), velY = new Float32Array(COUNT);
+  const mass = new Float32Array(COUNT), trailX = new Float32Array(COUNT * TRAIL), trailY = new Float32Array(COUNT * TRAIL);
+  let width = 0, height = 0, image = null, pixels = null, time = 0, running = false;
+  const grainColour = () => {
+    const theme = document.documentElement.dataset.theme;
+    return (theme ? theme === "dark" : darkQuery.matches) ? 0xe182f0ff : 0xff067aa8;
+  };
+  let colour = grainColour();
+  const F2 = 0.5 * (Math.sqrt(3) - 1), G2 = (3 - Math.sqrt(3)) / 6;
+  const perm = new Uint8Array(512), permMod12 = new Uint8Array(512);
+  const seed = new Uint8Array(256).map(() => Math.floor(Math.random() * 256));
+  for (let i = 0; i < 512; i++) { perm[i] = seed[i & 255]; permMod12[i] = perm[i] % 12; }
+  const grad3 = new Float32Array([1, 1, -1, 1, 1, -1, -1, -1, 1, 0, -1, 0, 1, 0, -1, 0, 0, 1, 0, -1, 0, 1, 0, -1]);
+  function noise2D(xin, yin) {
+    const s = (xin + yin) * F2, i = Math.floor(xin + s), j = Math.floor(yin + s), t = (i + j) * G2;
+    const x0 = xin - (i - t), y0 = yin - (j - t), i1 = x0 > y0 ? 1 : 0, j1 = x0 > y0 ? 0 : 1;
+    const x1 = x0 - i1 + G2, y1 = y0 - j1 + G2, x2 = x0 - 1 + 2 * G2, y2 = y0 - 1 + 2 * G2, ii = i & 255, jj = j & 255;
+    let n = 0, c;
+    if ((c = 0.5 - x0 * x0 - y0 * y0) >= 0) { const g = permMod12[ii + perm[jj]] * 2; c *= c; n += c * c * (grad3[g] * x0 + grad3[g + 1] * y0); }
+    if ((c = 0.5 - x1 * x1 - y1 * y1) >= 0) { const g = permMod12[ii + i1 + perm[jj + j1]] * 2; c *= c; n += c * c * (grad3[g] * x1 + grad3[g + 1] * y1); }
+    if ((c = 0.5 - x2 * x2 - y2 * y2) >= 0) { const g = permMod12[ii + 1 + perm[jj + 1]] * 2; c *= c; n += c * c * (grad3[g] * x2 + grad3[g + 1] * y2); }
+    return 70 * n;
+  }
+  function spawn(i, anywhere) {
+    posX[i] = Math.random() * width; posY[i] = anywhere ? Math.random() * height : -5;
+    velX[i] = 0.3 + Math.random() * 0.5; velY[i] = (Math.random() - 0.5) * 0.2; mass[i] = 0.6 + Math.random() * 0.8;
+    for (let t = 0; t < TRAIL; t++) { trailX[i * TRAIL + t] = posX[i]; trailY[i * TRAIL + t] = posY[i]; }
+  }
+  function resize() {
+    width = Math.max(1, innerWidth); height = Math.max(1, innerHeight);
+    canvas.width = width; canvas.height = height;
+    image = ctx.createImageData(width, height); pixels = new Uint32Array(image.data.buffer);
+    for (let i = 0; i < COUNT; i++) spawn(i, true);
+    if (!running) draw(false);
+  }
+  function plot(x, y, rgba) {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    if (ix >= 0 && ix < width && iy >= 0 && iy < height) pixels[iy * width + ix] = rgba;
+  }
+  function draw(move) {
+    pixels.fill(0); time += 0.008;
+    const windX = 1.76 + Math.sin(time * 0.8) * 0.55, windY = 0.3 + Math.cos(time * 0.5) * 0.15;
+    for (let i = 0; i < COUNT; i++) {
+      const base = i * TRAIL;
+      if (move) {
+        for (let t = TRAIL - 1; t > 0; t--) { trailX[base + t] = trailX[base + t - 1]; trailY[base + t] = trailY[base + t - 1]; }
+        trailX[base] = posX[i]; trailY[base] = posY[i];
+        const n = noise2D(posX[i] * 0.005, posY[i] * 0.005 + time) * Math.PI * 2, inv = 1 / mass[i];
+        const vx = (velX[i] + (windX + Math.cos(n) * 0.55) * inv * 0.03) * 0.94;
+        const vy = (velY[i] + (windY + Math.sin(n) * 0.55 + 0.05 * mass[i]) * inv * 0.03) * 0.94;
+        let nx = posX[i] + vx, ny = posY[i] + vy;
+        if (nx > width + 10 || ny > height + 10) {
+          const fromTop = Math.random() < 0.6;
+          spawn(i, false);
+          posX[i] = fromTop ? Math.random() * width : -5; posY[i] = fromTop ? -5 : Math.random() * height;
+        } else {
+          if (nx < -15) nx = width + 5;
+          if (ny < -10) ny = height + 5;
+          posX[i] = nx; posY[i] = ny; velX[i] = vx; velY[i] = vy;
+        }
+      }
+      for (let t = 0; t < TRAIL; t++) {
+        const alpha = Math.floor(255 * (1 - (t + 1) / (TRAIL + 1)) * 0.85);
+        plot(trailX[base + t], trailY[base + t], (colour & 0x00ffffff) | (alpha << 24));
+      }
+      plot(posX[i], posY[i], colour);
+    }
+    ctx.putImageData(image, 0, 0);
+  }
+  function frame() { if (!running) return; draw(true); requestAnimationFrame(frame); }
+  function start() { running = !stillQuery.matches && !document.hidden; if (running) requestAnimationFrame(frame); else draw(false); }
+  const recolour = () => { colour = grainColour(); if (!running) draw(false); };
+  addEventListener("resize", resize);
+  addEventListener("grain-theme", recolour);
+  darkQuery.addEventListener("change", recolour);
+  stillQuery.addEventListener("change", () => { running = false; start(); });
+  document.addEventListener("visibilitychange", () => { running = false; start(); });
+  resize(); start();
+})();
+
+// ---------------------------------------------------------------- hero demo
+(function demo() {
+  const EXAMPLES = [
+    {say: "search youtube for lo-fi beats", how: "a phrase", call: 'open_youtube(query: "lo-fi beats")', result: ["Ran", "ok"]},
+    {say: "set a timer for five minutes", how: "a phrase", call: "set_timer(minutes: 5)", result: ["Ran", "ok"]},
+    {say: "turn it up a bit", how: "Needle, 91% sure", call: 'adjust_volume(direction: "up")', result: ["Ran", "ok"]},
+    {say: "run my backup script", how: "a phrase", call: "my_backup()", result: ["Waiting for your “yes”", "warn"]},
+    {say: "open notepad then what time is it", how: "two phrases", call: 'open_app(app: "notepad") + tell_time()', result: ["Ran both", "ok"]},
+  ];
+  const card = document.getElementById("demo"), said = document.getElementById("demoSaid"), state = document.getElementById("demoState");
+  const steps = [...document.querySelectorAll("#demoSteps li")];
+  const how = document.getElementById("dHow"), call = document.getElementById("dCall"), result = document.getElementById("dResult");
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const fill = (ex) => {
+    how.textContent = ex.how; call.textContent = ex.call;
+    result.innerHTML = ""; const chip = document.createElement("span");
+    chip.className = "chip " + ex.result[1]; chip.textContent = ex.result[0]; result.appendChild(chip);
+  };
+  if (stillQuery.matches) {  // a still, complete example
+    fill(EXAMPLES[0]); said.textContent = `“${EXAMPLES[0].say}”`; state.textContent = "Done";
+    steps.forEach((s) => s.classList.add("on"));
+    return;
+  }
+  let index = 0;
+  (async function loop() {
+    for (;;) {
+      const ex = EXAMPLES[index++ % EXAMPLES.length];
+      steps.forEach((s) => s.classList.remove("on"));
+      card.classList.add("listening"); state.textContent = "Listening…";
+      said.innerHTML = '“<span id="typed"></span><span class="caret"></span>';
+      const typed = document.getElementById("typed");
+      for (const ch of ex.say) { typed.textContent += ch; await wait(42 + Math.random() * 40); }
+      said.textContent = `“${ex.say}”`;
+      card.classList.remove("listening"); state.textContent = "Understood";
+      fill(ex);
+      for (const s of steps) { await wait(380); s.classList.add("on"); }
+      await wait(2600);
+    }
+  })();
+})();
+
+// ---------------------------------------------------------------- code tabs
+(function tabs() {
+  const list = document.querySelector('[role="tablist"]'), buttons = [...list.querySelectorAll('[role="tab"]')];
+  const select = (button) => {
+    buttons.forEach((b) => {
+      const on = b === button;
+      b.setAttribute("aria-selected", String(on)); b.tabIndex = on ? 0 : -1;
+      document.getElementById(b.getAttribute("aria-controls")).hidden = !on;
+    });
+  };
+  buttons.forEach((b, i) => {
+    b.addEventListener("click", () => select(b));
+    b.addEventListener("keydown", (e) => {
+      const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+      if (!step) return;
+      const next = buttons[(i + step + buttons.length) % buttons.length];
+      select(next); next.focus();
+    });
+  });
+})();
+</script>
+</body>
+</html>
