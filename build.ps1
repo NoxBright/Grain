@@ -13,10 +13,16 @@ $version = & $py -c "import grain; print(grain.__version__)"
 $app = "dist\Grain"
 Write-Host "Building Grain $version"
 
-# The Needle engine DLL, bundled so the app never downloads it
-$engine = & $py -c "import os, needle.agent.fetch as f; print(os.path.join(f.cache_dir(3), 'libneedle.dll'))"
+# The Needle engine DLL, bundled so the app never downloads it. Prefer the pinned release input;
+# the cache fallback is useful for local development with a matching cactus-needle package.
+$vendoredEngine = Join-Path $PSScriptRoot "vendor\windows\libneedle.dll"
+if (Test-Path $vendoredEngine) {
+    $engine = $vendoredEngine
+} else {
+    $engine = & $py -c "import os, needle.agent.fetch as f; print(os.path.join(f.cache_dir(3), 'libneedle.dll'))"
+}
 if (-not (Test-Path $engine)) {
-    throw "Needle native engine not found at $engine. Install the Windows build dependencies and run a local Needle model smoke test before building. Grain must have its engine available before packaging."
+    throw "Needle native engine not found at $engine. Add vendor\windows\libneedle.dll or install a matching cactus-needle engine cache before building."
 }
 
 Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
