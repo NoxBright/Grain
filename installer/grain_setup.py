@@ -111,6 +111,16 @@ def set_startup(folder, enabled):
                 pass
 
 
+def startup_enabled():
+    """Whether the existing Grain install is configured to start with Windows."""
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as key:
+            value = winreg.QueryValueEx(key, APP)[0]
+            return bool(value)
+    except OSError:
+        return False
+
+
 def remove_key(path):
     try:
         winreg.DeleteKey(winreg.HKEY_CURRENT_USER, path)
@@ -297,7 +307,7 @@ def window(uninstalling, folder):
     else:
         option("shortcuts", "Add Grain to the Start menu", True)
         option("desktop", "Add a desktop shortcut", False)
-        option("startup", "Start Grain when I sign in", False)
+        option("startup", "Start Grain when I sign in", startup_enabled() if updating else False)
         option("launch", "Start Grain when setup finishes", True)
     status = ttk.Label(frame, text="", foreground="#666")
     status.grid(sticky="w", pady=(12, 0))
@@ -362,7 +372,8 @@ def main():
         if uninstalling:
             uninstall(folder, args.remove_data, progress=lambda message: None)
         else:
-            target = install(folder, not args.no_shortcuts, args.desktop, args.startup, registry=not args.no_registry,
+            startup = args.startup or (is_grain_folder(folder) and startup_enabled())
+            target = install(folder, not args.no_shortcuts, args.desktop, startup, registry=not args.no_registry,
                              progress=lambda message: None)
             if not args.no_launch:
                 subprocess.Popen([target], cwd=folder, close_fds=True)

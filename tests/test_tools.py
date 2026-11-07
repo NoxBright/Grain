@@ -348,6 +348,22 @@ class Confirmation(unittest.TestCase):
         self.assertEqual(self.calls, [])
         self.assertEqual(say("Cancel.")[0]["outcome"], "cancelled")
 
+    def test_program_pending_call_cannot_steal_a_voice_yes(self):
+        grain_app.engine.interpret("Run the confirm test.", source="program:tests", may_confirm=False).result(timeout=120)
+        self.assertEqual(self.calls, [])
+        self.assertNotEqual(say("Yes.")[0]["outcome"], "confirmed")
+        self.assertEqual(self.calls, [])
+        pending = grain_app.engine.pending_list()
+        self.assertTrue(pending)
+        self.assertEqual(grain_app.engine.cancel(pending[-1]["id"]).result(timeout=120)[0]["outcome"], "cancelled")
+
+    def test_preview_yes_cannot_confirm_a_waiting_call(self):
+        say("Run the confirm test.")
+        preview = grain_app.engine.interpret("yes", execute=False, source="editor").result(timeout=120)
+        self.assertNotEqual(preview[0]["outcome"], "confirmed")
+        self.assertEqual(self.calls, [])
+        self.assertEqual(say("Yes.")[0]["outcome"], "confirmed")
+
     def test_listing_while_calls_expire_on_other_threads(self):
         engine, entry = grain_app.engine, grain_app.history.add(text="expiry race")
         with engine._pending_lock:

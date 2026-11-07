@@ -204,6 +204,11 @@ class Api(unittest.TestCase):
     def test_unknown_folder_refused(self):
         self.assertEqual(self.call("POST", "/v1/open/windows")[0], 404)
 
+    def test_invalid_profile_rule_process_is_refused(self):
+        profiles = self.call("GET", "/v1/profiles")[1]
+        profiles["profile_rules"] = [{"process": None, "profile": profiles["profiles"].keys().__iter__().__next__()}]
+        self.assertEqual(self.call("PUT", "/v1/profiles", profiles)[0], 400)
+
     # ------------------------------------------------------------ program keys
 
     def make_key(self, client):

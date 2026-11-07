@@ -229,6 +229,9 @@ class Handler(BaseHTTPRequestHandler):
         existing = self.grain.registry.get(data["name"])
         if existing and existing.source != "file":
             raise ApiError(409, "name_taken", f"{data['name']} is already a {existing.source} tool")
+        new_path = self._tool_path(data["name"])
+        if os.path.abspath(new_path) != os.path.abspath(old_path) and os.path.exists(new_path):
+            raise ApiError(409, "name_taken", f"a tool file named {data['name']}.json already exists")
         try:
             path = save_tool_file(TOOLS_DIR, data)
         except (ValueError, KeyError, TypeError) as error:
@@ -301,8 +304,10 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(profiles, dict) or not profiles or not all(
                 isinstance(p, list) and all(isinstance(x, str) for x in p) for p in profiles.values()):
             raise ApiError(400, "invalid_request", "profiles: {name: [tool name patterns]}")
-        if not isinstance(rules, list) or not all(isinstance(r, dict) and r.get("profile") in profiles for r in rules):
-            raise ApiError(400, "invalid_request", "profile_rules: [{process, profile}] naming existing profiles")
+        if not isinstance(rules, list) or not all(
+                isinstance(r, dict) and isinstance(r.get("process"), str) and r["process"].strip()
+                and r.get("profile") in profiles for r in rules):
+            raise ApiError(400, "invalid_request", "profile_rules: [{process: string, profile}] naming existing profiles")
         if active != "auto" and active not in profiles:
             raise ApiError(400, "invalid_request", "active_profile must be 'auto' or a profile name")
         config.update(profiles=profiles, profile_rules=rules, active_profile=active)

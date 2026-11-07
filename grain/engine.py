@@ -181,8 +181,9 @@ class Engine:
         profile = profile or current_profile(self.config)
         with self._pending_lock:
             self._expire()
-            latest = next(reversed(self.pending), None) if may_confirm else None
-        if latest:
+            latest = next((pending_id for pending_id in reversed(self.pending)
+                           if not self.pending[pending_id]["source"].startswith("program:")), None) if may_confirm else None
+        if latest and execute:
             spoken = " ".join(re.sub(r"[^\w\s']", " ", text.lower()).split())
             if YES.match(spoken):
                 return self._confirm(latest)

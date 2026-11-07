@@ -1048,7 +1048,7 @@ function renderEditor() {
     <details ${d.threshold != null || (d.keywords || []).length ? "open" : ""}><summary>More options</summary>
       <label class="f">How sure must the AI be? <span>· only matters when no phrase matched</span></label>
       <div class="row"><label class="switch"><input type="checkbox" id="e_thrDefault" ${d.threshold == null ? "checked" : ""} ${dis}> Use Grain's default</label>
-        <input type="range" id="e_thr" min="0.1" max="0.95" step="0.05" value="${d.threshold ?? 0.5}" class="grow" ${d.threshold == null || ro ? "disabled" : ""}>
+         <input type="range" id="e_thr" min="0.1" max="0.95" step="0.05" value="${esc(d.threshold ?? 0.5)}" class="grow" ${d.threshold == null || ro ? "disabled" : ""}>
         <b id="e_thrVal" style="width:44px;text-align:right">${d.threshold == null ? "" : Math.round(d.threshold * 100) + "%"}</b></div>
       <label class="f">Words to listen for <span>· helps speech recognition with unusual names, comma separated</span></label>
       <input type="text" id="e_keywords" value="${esc((d.keywords || []).join(", "))}" ${dis} placeholder="youtube, hexapod">
@@ -1126,12 +1126,12 @@ function renderParams() {
     const s = d.parameters[name];
     return `<div class="param-card" data-param="${esc(name)}">
       <div class="row"><b class="mono ph">{${esc(name)}}</b>
-        <span class="chip" style="margin-left:4px">${TYPE_LABEL[s.type] || s.type}${s.enum ? " · choice" : ""}</span>
+        <span class="chip" style="margin-left:4px">${esc(TYPE_LABEL[s.type] || s.type)}${s.enum ? " · choice" : ""}</span>
         ${s.required === false ? `<span class="chip">optional</span>` : ""}
         <span class="chip warn" data-unused="${esc(name)}" ${isUsed(name) || ro ? "hidden" : ""} title="No phrase or action uses this">not used yet</span>
         <span class="grow"></span>${ro ? "" : `<button class="icon-btn" data-del-param="${esc(name)}" title="Remove">✕</button>`}</div>
       <div class="grid">
-        <div><label class="f" style="margin-top:0">Kind</label><select data-k="type" ${dis}>${Object.entries(TYPE_LABEL).map(([v, l]) => `<option value="${v}" ${s.type === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+        <div><label class="f" style="margin-top:0">Kind</label><select data-k="type" ${dis}>${Object.entries(TYPE_LABEL).map(([v, l]) => `<option value="${esc(v)}" ${s.type === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></div>
         <div><label class="f" style="margin-top:0">Only allow these <span>· comma separated, optional</span></label><input type="text" data-k="enum" value="${esc((s.enum || []).join(", "))}" ${dis} placeholder="forward, back, left, right"></div>
         <div><label class="f" style="margin-top:0">Hint for the AI <span>· optional</span></label><input type="text" data-k="description" value="${esc(s.description || "")}" ${dis} placeholder="What to search for"></div>
         <div><label class="f" style="margin-top:0">&nbsp;</label><label class="switch"><input type="checkbox" data-k="required" ${s.required !== false ? "checked" : ""} ${dis}> Always needed</label></div>
@@ -1485,7 +1485,7 @@ function openFix(slot, entry) {
       const v = preset[n] ?? "";
       const input = s.enum ? `<select data-arg="${esc(n)}"><option value="">(leave out)</option>${s.enum.map((o) => `<option ${String(v) === String(o) ? "selected" : ""}>${esc(o)}</option>`).join("")}</select>`
         : s.type === "boolean" ? `<select data-arg="${esc(n)}" data-type="boolean"><option value="">(leave out)</option><option value="true" ${v === true ? "selected" : ""}>yes</option><option value="false" ${v === false ? "selected" : ""}>no</option></select>`
-        : `<input type="${s.type === "integer" || s.type === "number" ? "number" : "text"}" data-arg="${esc(n)}" data-type="${s.type}" value="${esc(v)}">`;
+        : `<input type="${s.type === "integer" || s.type === "number" ? "number" : "text"}" data-arg="${esc(n)}" data-type="${esc(s.type)}" value="${esc(v)}">`;
       return `<label class="f">${esc(n)}${s.required === false ? " <span>· optional</span>" : ""}</label>${input}`;
     }).join("");
   };
@@ -1528,10 +1528,10 @@ async function loadProfiles() {
   const p = await api("GET", "/v1/profiles");
   profileState = {
     active: p.active_profile, current: p.current,
-    profiles: Object.entries(p.profiles).map(([name, patterns]) => ({
+     profiles: Object.entries(p.profiles).map(([name, patterns]) => ({
       name, all: patterns.includes("*"),
       picked: new Set(tools.filter((t) => patterns.some((pat) => pat === t.name)).map((t) => t.name)),
-      extra: patterns.filter((pat) => pat !== "*" && /[*?]/.test(pat)),
+      extra: patterns.filter((pat) => pat !== "*" && !tools.some((t) => t.name === pat)),
     })),
     rules: p.profile_rules.map((r) => ({...r})),
   };
@@ -1573,7 +1573,13 @@ function renderProfiles() {
   $("profileCards").querySelectorAll(".panel").forEach((card) => {
     const pr = s.profiles[card.dataset.i];
     card.querySelector(".pr-name").addEventListener("input", (e) => { pr.name = e.target.value; profilesChanged(); });
-    card.querySelector(".pr-name").addEventListener("change", renderProfiles);
+     card.querySelector(".pr-name").addEventListener("change", (e) => {
+       const old = pr.name, next = e.target.value.trim();
+       pr.name = next;
+       if (profileState.active === old) profileState.active = next;
+       profileState.rules.forEach((rule) => { if (rule.profile === old) rule.profile = next; });
+       renderProfiles(); profilesChanged();
+     });
     card.querySelector(".pr-all").addEventListener("change", (e) => { pr.all = e.target.checked; if (!pr.all && !pr.picked.size) tools.forEach((t) => pr.picked.add(t.name)); renderProfiles(); profilesChanged(); });
     card.querySelectorAll("[data-pick]").forEach((cb) => cb.addEventListener("change", () => {
       if (cb.checked) pr.picked.add(cb.dataset.pick); else pr.picked.delete(cb.dataset.pick);
@@ -1640,7 +1646,8 @@ function recordHotkey(input, button, onDone) {
 }
 
 function micOptions(selected) {
-  return `<option value="">Windows default microphone</option>` + micList.map((m) => `<option ${m === selected ? "selected" : ""}>${esc(m)}</option>`).join("");
+  const unavailable = selected && !micList.includes(selected) ? `<option value="${esc(selected)}" selected>${esc(selected)} (currently unavailable)</option>` : "";
+  return `<option value="">Windows default microphone</option>${unavailable}` + micList.map((m) => `<option value="${esc(m)}" ${m === selected ? "selected" : ""}>${esc(m)}</option>`).join("");
 }
 
 function settingsForm() {

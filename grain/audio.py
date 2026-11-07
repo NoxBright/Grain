@@ -125,6 +125,10 @@ def capture_utterance(mic, config, should_stop, start_timeout=None):
     while not should_stop():
         frame = mic.read()
         if frame is None:
+            if start_timeout is not None:
+                waited += 0.5  # read() waits half a second when PortAudio supplies no frame
+                if waited > start_timeout:
+                    return None
             continue
         rms = float(np.sqrt(np.mean(frame ** 2)))
         mic.peak = max(mic.peak, rms)

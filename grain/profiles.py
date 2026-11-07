@@ -19,7 +19,9 @@ def current_profile(config):
         return chosen
     process = foreground_process().lower()
     for rule in config.get("profile_rules", []):
-        if process and fnmatch.fnmatch(process, rule.get("process", "").lower()) and rule.get("profile") in config["profiles"]:
+        pattern = rule.get("process") if isinstance(rule, dict) else None
+        if process and isinstance(pattern, str) and fnmatch.fnmatch(process, pattern.lower()) \
+                and rule.get("profile") in config["profiles"]:
             return rule["profile"]
     return "default" if "default" in config["profiles"] else next(iter(config["profiles"]), "default")
 
