@@ -112,8 +112,8 @@ jobs:
             if (Test-Path $install) { Get-ChildItem $install -Recurse | Select-Object FullName }
             throw "Silent install smoke test failed"
           }
-          & "$install\Uninstall Grain.exe" --silent --dir $install
-          if ($LASTEXITCODE) { throw "Silent uninstall smoke test failed" }
+          $uninstallProcess = Start-Process -FilePath "$install\Uninstall Grain.exe" -ArgumentList @("--silent", "--dir", $install) -Wait -PassThru
+          if ($uninstallProcess.ExitCode) { throw "Silent uninstall smoke test failed" }
           $removed = $false
           for ($attempt = 0; $attempt -lt 30; $attempt++) {
             if (-not (Test-Path "$install\Grain App.exe")) { $removed = $true; break }
