@@ -81,6 +81,25 @@ class DataFolder(unittest.TestCase):
         config_module._install_defaults(config)
         self.assertEqual(read(mine), '{"edited": true}')
 
+    def test_retiring_default_preserves_edited_file(self):
+        config = {"installed_defaults": ["tools/a.json"], "default_hashes": {"tools/a.json": "original"}}
+        edited = os.path.join(self.data_dir, "tools", "a.json")
+        os.makedirs(os.path.dirname(edited), exist_ok=True)
+        write(edited, '{"edited": true}')
+        os.remove(os.path.join(self.app_dir, "defaults", "tools", "a.json"))
+        config_module._install_defaults(config)
+        self.assertTrue(os.path.exists(edited))
+
+    def test_empty_defaults_folder_does_not_retire_everything(self):
+        config = {"installed_defaults": ["tools/a.json"], "default_hashes": {"tools/a.json": "original"}}
+        edited = os.path.join(self.data_dir, "tools", "a.json")
+        os.makedirs(os.path.dirname(edited), exist_ok=True)
+        write(edited, '{"edited": true}')
+        shutil.rmtree(os.path.join(self.app_dir, "defaults", "tools"))
+        os.makedirs(os.path.join(self.app_dir, "defaults", "tools"))
+        config_module._install_defaults(config)
+        self.assertTrue(os.path.exists(edited))
+
 
 class Upgrades(unittest.TestCase):
     def test_settings_from_version_1_are_upgraded(self):

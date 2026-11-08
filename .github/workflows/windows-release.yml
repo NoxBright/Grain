@@ -4,6 +4,12 @@ on:
   workflow_dispatch:
   push:
     branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: windows-release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -11,12 +17,13 @@ permissions:
 jobs:
   test-windows:
     runs-on: windows-latest
+    timeout-minutes: 15
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.11'
 
@@ -37,12 +44,13 @@ jobs:
   build-windows:
     needs: test-windows
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.11'
 
@@ -64,8 +72,54 @@ jobs:
         shell: pwsh
         run: .\build.ps1
 
+      - name: Validate packaged payload
+        shell: pwsh
+        run: |
+          $required = @(
+            "dist\Grain\Grain App.exe",
+            "dist\Grain\Uninstall Grain.exe",
+            "dist\Grain\models\needle3.cact",
+            "dist\Grain\models\whistle.cact",
+            "dist\Grain\THIRD_PARTY_NOTICES.txt",
+            "dist\Grain\licenses\needle3-model.txt",
+            "dist\Grain\licenses\whistle-model.txt",
+            "dist\Grain\defaults\tools\open_youtube.json",
+            "dist\Grain\defaults\plugins\everyday.py"
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path $path)) { throw "Missing release payload file: $path" }
+          }
+
+      - name: Smoke test frozen app
+        shell: pwsh
+        run: |
+          $smokeData = Join-Path $env:RUNNER_TEMP "grain-smoke-data"
+          New-Item -ItemType Directory -Force $smokeData | Out-Null
+          $env:GRAIN_DATA_DIR = $smokeData
+          & "dist\Grain\Grain App.exe" --text "what time is it" --dry-run
+          if ($LASTEXITCODE) { throw "Frozen Grain App.exe smoke test failed" }
+
+      - name: Smoke test silent install and uninstall
+        shell: pwsh
+        run: |
+          $installer = (Get-ChildItem "dist\Grain Setup *.exe" | Select-Object -First 1).FullName
+          $install = Join-Path $env:RUNNER_TEMP "grain-install"
+          & $installer --silent --dir $install --no-shortcuts --no-registry --no-launch
+          if ($LASTEXITCODE -or -not (Test-Path "$install\Grain App.exe")) { throw "Silent install smoke test failed" }
+          & "$install\Uninstall Grain.exe" --silent --dir $install
+          if ($LASTEXITCODE) { throw "Silent uninstall smoke test failed" }
+          Start-Sleep -Seconds 6
+          if (Test-Path $install) { throw "Silent uninstall left the install folder behind" }
+
+      - name: Write release checksums
+        shell: pwsh
+        run: |
+          Get-FileHash "dist\Grain Setup *.exe" -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash)  $([IO.Path]::GetFileName($_.Path))" } |
+            Set-Content "dist\SHA256SUMS.txt"
+
       - name: Upload Windows build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: Grain-Windows-${{ github.sha }}
           path: |

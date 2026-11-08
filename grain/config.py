@@ -6,6 +6,7 @@ the log, and the user's tools, plugins and fine-tuned models. That folder is %AP
 on Windows and $XDG_DATA_HOME/Grain (default ~/.local/share/Grain) on Linux.
 """
 import json
+import hashlib
 import logging
 import os
 import secrets
@@ -57,7 +58,7 @@ def missing_models():
     return [name for name, path in (("needle3.cact", NEEDLE_WEIGHTS), ("whistle.cact", WHISTLE_WEIGHTS))
             if not os.path.isfile(path)]
 
-CONFIG_VERSION = 2  # bump with a step in MIGRATIONS when the settings format changes
+CONFIG_VERSION = 3  # bump with a step in MIGRATIONS when the settings format changes
 
 DEFAULT_CONFIG = {
     "config_version": CONFIG_VERSION,
@@ -106,6 +107,7 @@ DEFAULT_CONFIG = {
     # Empty by default: users can opt into foreground-app rules for their own software.
     "profile_rules": [],
     "installed_defaults": [],  # default tool/plugin files already copied, so deleted ones stay deleted
+    "default_hashes": {},  # hashes of shipped defaults, used to protect user edits during retirement
 }
 
 
@@ -142,7 +144,12 @@ def _from_v1(config):
     return config
 
 
-MIGRATIONS = {1: _from_v1}  # from version -> function returning the next version's settings
+def _from_v2(config):
+    config.setdefault("default_hashes", {})
+    return config
+
+
+MIGRATIONS = {1: _from_v1, 2: _from_v2}  # from version -> function returning the next version's settings
 
 
 def migrate(config):
@@ -177,17 +184,31 @@ def _install_defaults(config):
     and ones Grain no longer ships are retired: a default replaced by a built-in tool would
     otherwise linger in the data folder and clash with it on every start."""
     installed = set(config.get("installed_defaults", []))
+    hashes = config.setdefault("default_hashes", {})
+
+    def digest(path):
+        try:
+            with open(path, "rb") as handle:
+                return hashlib.sha256(handle.read()).hexdigest()
+        except OSError:
+            return None
+
     for folder, suffix in (("tools", ".json"), ("plugins", ".py")):
         source_dir, target_dir = os.path.join(DEFAULTS_DIR, folder), os.path.join(DATA_DIR, folder)
         if not os.path.isdir(source_dir) or os.path.abspath(source_dir) == os.path.abspath(target_dir):
             continue
         shipped = {f"{folder}/{name}" for name in os.listdir(source_dir) if name.endswith(suffix)}
+        if not shipped:
+            continue
         for key in sorted(installed & _retired(folder, installed, shipped)):
             installed.discard(key)
             target = os.path.join(DATA_DIR, key.replace("/", os.sep))
-            if os.path.exists(target):
+            if os.path.exists(target) and hashes.get(key) and digest(target) == hashes[key]:
                 log.info("retiring default %s: Grain ships it no longer", key)
                 os.remove(target)
+            elif os.path.exists(target):
+                log.info("preserving edited default %s", key)
+            hashes.pop(key, None)
         os.makedirs(target_dir, exist_ok=True)
         for name in sorted(os.listdir(source_dir)):
             key = f"{folder}/{name}"
@@ -196,6 +217,9 @@ def _install_defaults(config):
             target = os.path.join(target_dir, name)
             if not os.path.exists(target):
                 shutil.copy2(os.path.join(source_dir, name), target)
+            source_hash = digest(os.path.join(source_dir, name))
+            if source_hash and digest(target) == source_hash:
+                hashes.setdefault(key, source_hash)
             installed.add(key)
     config["installed_defaults"] = sorted(installed)
 
