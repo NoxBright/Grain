@@ -224,6 +224,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def put_tool_file(self, name):
         old_path, data = self._tool_path(name), self._body()
+        if not isinstance(data.get("name"), str):
+            raise ApiError(400, "invalid_tool", "name must be a string")
         self._tool_path(data.get("name", ""))
         if data.get("safety") and data["safety"] not in SAFETY:
             raise ApiError(400, "invalid_request", f"safety must be one of {', '.join(SAFETY)}")
@@ -256,7 +258,7 @@ class Handler(BaseHTTPRequestHandler):
         if not text:
             raise ApiError(400, "invalid_request", "send text")
         profile = body.get("profile")
-        if profile and profile not in self.grain.config["profiles"]:
+        if profile is not None and (not isinstance(profile, str) or profile not in self.grain.config["profiles"]):
             raise ApiError(400, "invalid_request", f"no profile {profile!r}")
         if self.program:  # its results are labelled as its own, and its words never approve a pending call
             future = self.grain.engine.interpret(text, execute=bool(body.get("execute", True)), profile=profile,
@@ -303,13 +305,14 @@ class Handler(BaseHTTPRequestHandler):
         rules = body.get("profile_rules", config["profile_rules"])
         active = body.get("active_profile", config["active_profile"])
         if not isinstance(profiles, dict) or not profiles or not all(
-                isinstance(p, list) and all(isinstance(x, str) for x in p) for p in profiles.values()):
+                isinstance(name, str) and name and name != "auto" and isinstance(p, list)
+                and all(isinstance(x, str) for x in p) for name, p in profiles.items()):
             raise ApiError(400, "invalid_request", "profiles: {name: [tool name patterns]}")
         if not isinstance(rules, list) or not all(
                 isinstance(r, dict) and isinstance(r.get("process"), str) and r["process"].strip()
-                and r.get("profile") in profiles for r in rules):
+                and isinstance(r.get("profile"), str) and r["profile"] in profiles for r in rules):
             raise ApiError(400, "invalid_request", "profile_rules: [{process: string, profile}] naming existing profiles")
-        if active != "auto" and active not in profiles:
+        if not isinstance(active, str) or (active != "auto" and active not in profiles):
             raise ApiError(400, "invalid_request", "active_profile must be 'auto' or a profile name")
         config.update(profiles=profiles, profile_rules=rules, active_profile=active)
         config.save()
@@ -370,6 +373,8 @@ class Handler(BaseHTTPRequestHandler):
         import numpy as np
         from .audio import Microphone
         device = self._body().get("device", self.grain.config.get("input_device"))
+        if device is not None and (isinstance(device, bool) or not isinstance(device, (str, int))):
+            raise ApiError(400, "invalid_request", "device must be a microphone name, index, or null")
         mic = Microphone(device)
         peak, frames = 0.0, 0
         try:

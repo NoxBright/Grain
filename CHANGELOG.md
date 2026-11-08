@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.1.0 - 2026-11-09
+
 Security:
 
 - **Program keys.** Programs and scripts get a key of their own from the tool editor (Settings → Program keys) instead of using the tool editor's key from `settings.json`.

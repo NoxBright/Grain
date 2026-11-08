@@ -359,6 +359,14 @@ class Api(unittest.TestCase):
         self.assertEqual(self.call("GET", "/v1/history?limit=lots")[0], 400)
         self.assertEqual(self.call("GET", "/v1/events?timeout=soon")[0], 400)
         self.assertEqual(self.call("POST", "/v1/keys", ["not", "an", "object"])[0], 400)
+        self.assertEqual(self.call("POST", "/v1/interpret", {"text": "time", "profile": {}})[0], 400)
+        profiles = self.call("GET", "/v1/profiles")[1]
+        profiles["active_profile"] = {}
+        self.assertEqual(self.call("PUT", "/v1/profiles", profiles)[0], 400)
+        self.assertEqual(self.call("PUT", "/v1/tool_files/bad", {
+            "name": 5, "description": "bad", "parameters": {},
+            "action": {"type": "open", "target": "https://example.com"}})[0], 400)
+        self.assertEqual(self.call("POST", "/v1/settings/test_microphone", {"device": {}})[0], 400)
         self.assertEqual(self.raw("PUT", "/v1/settings", b"{}", {"Content-Length": str(2_000_000)})[0], 413)
 
     def test_the_port_is_held_exclusively(self):
