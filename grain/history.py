@@ -22,8 +22,18 @@ class History:
 
     def _write(self):
         self._entries = self._entries[-self.keep:]
-        with open(self.path, "w", encoding="utf-8") as handle:
-            handle.writelines(json.dumps(e) + "\n" for e in self._entries)
+        temporary = self.path + ".tmp"
+        try:
+            with open(temporary, "w", encoding="utf-8") as handle:
+                handle.writelines(json.dumps(e) + "\n" for e in self._entries)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, self.path)
+        finally:
+            try:
+                os.remove(temporary)
+            except FileNotFoundError:
+                pass
 
     def add(self, **entry):
         entry = {"id": uuid.uuid4().hex[:10], "time": time.time(), "correction": None, **entry}

@@ -179,8 +179,20 @@ def save_tool_file(folder, data):
     """Validate and write one tool file, named after the tool. Returns its path."""
     tool_from_data(data)  # raises on anything invalid
     path = os.path.join(folder, data["name"] + ".json")
-    with open(path, "w", encoding="utf-8") as handle:
-        json.dump(data, handle, indent=2)
+    os.makedirs(folder, exist_ok=True)
+    temporary = path + ".tmp"
+    try:
+        with open(temporary, "w", encoding="utf-8") as handle:
+            json.dump(data, handle, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        try:
+            os.remove(temporary)
+        except FileNotFoundError:
+            pass
     return path
 
 

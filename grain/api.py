@@ -173,13 +173,14 @@ class Handler(BaseHTTPRequestHandler):
                     "tools": [t.name for t in grain.registry.all() if t.source == "remote" and t.origin == self.client]}
         active = grain.active_tools()
         return {"app": "Grain", "profile": grain.profile(), "active_tools": [t.name for t in active],
-                "model": os.path.basename(needle_weights(grain.config)), "api_port": grain.config["api_port"],
+                "model": os.path.basename(needle_weights(grain.config)),
                 "hotkey": grain.config["hotkey"], "wake_words": grain.config["wake_words"],
                 "confidence_threshold": grain.config["confidence_threshold"], "confirm_seconds": grain.config["confirm_seconds"],
                 "version": __version__, "setup_done": bool(grain.config.get("setup_done")),
                 "tool_count": len(grain.registry.all()), "too_many_tools": len(active) > grain.TOO_MANY_TOOLS,
                 "pending": len(grain.engine.pending_list()), "mic": grain.mic_name, "load_errors": grain.load_errors,
-                "models_ready": not missing_models(), "missing_models": missing_models()}
+                "models_ready": not missing_models(), "missing_models": missing_models(),
+                "api_port": getattr(grain, "serving_port", grain.config["api_port"])}
 
     def list_tools(self):
         active = {t.name for t in self.grain.active_tools()}
@@ -473,6 +474,7 @@ def serve(grain, port):
     """Start the API on a background thread; returns the server, or raises OSError if the port is taken."""
     Handler.grain = grain
     server = Server(("127.0.0.1", port), Handler)
+    grain.serving_port = server.server_address[1]
     threading.Thread(target=server.serve_forever, name="grain-api", daemon=True).start()
     log.info("API on http://127.0.0.1:%d", port)
     return server

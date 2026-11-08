@@ -86,6 +86,7 @@ DEFAULT_CONFIG = {
     },
     "app_aliases": {},  # aliases for configured apps or installed Start-menu names
     "api_port": 8765,
+    "serving_api_port": None,  # actual bound port; differs while a changed api_port awaits restart
     "api_token": None,  # the owner key, for the tool editor; generated on first run
     "api_keys": [],  # program keys made in the tool editor: {id, client, hash, created, last_used} (keys.py)
     "active_profile": "auto",  # "auto" picks by foreground app via profile_rules

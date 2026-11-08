@@ -280,7 +280,8 @@ class TrayApp:
             if port != first:
                 log.info("port %d was taken; the API moved to %d", first, port)
                 self.config["api_port"] = port
-                self.config.save()
+            self.config["serving_api_port"] = port
+            self.config.save()
             return True
         self.notify(f"The tool editor couldn't start: ports {first}-{first + 19} are all in use.")
         return False
@@ -386,8 +387,9 @@ def claim_single_instance():
     return _instance_mutex
 
 
-def editor_url(config, section=""):
-    return f"http://127.0.0.1:{config['api_port']}/ui/{section}#token={config['api_token']}"
+def editor_url(config, section="", port=None):
+    bound = port or config.get("serving_api_port") or config["api_port"]
+    return f"http://127.0.0.1:{bound}/ui/{section}#token={config['api_token']}"
 
 
 class PrivateFormatter(logging.Formatter):

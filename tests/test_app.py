@@ -215,6 +215,11 @@ class Api(unittest.TestCase):
     def test_unknown_folder_refused(self):
         self.assertEqual(self.call("POST", "/v1/open/windows")[0], 404)
 
+    def test_editor_url_uses_the_bound_port(self):
+        from grain.app import editor_url
+        config = Config({"api_port": 8765, "serving_api_port": 4321, "api_token": "test-token"})
+        self.assertIn("127.0.0.1:4321", editor_url(config))
+
     def test_invalid_profile_rule_process_is_refused(self):
         profiles = self.call("GET", "/v1/profiles")[1]
         profiles["profile_rules"] = [{"process": None, "profile": profiles["profiles"].keys().__iter__().__next__()}]
