@@ -105,7 +105,13 @@ jobs:
           $installer = (Get-ChildItem "dist\Grain Setup *.exe" | Select-Object -First 1).FullName
           $install = Join-Path $env:RUNNER_TEMP "grain-install"
           & $installer --silent --dir $install --no-shortcuts --no-registry --no-launch
-          if ($LASTEXITCODE -or -not (Test-Path "$install\Grain App.exe")) { throw "Silent install smoke test failed" }
+          $installCode = $LASTEXITCODE
+          if ($installCode -or -not (Test-Path "$install\Grain App.exe")) {
+            Write-Host "Installer exit code: $installCode"
+            if (Test-Path "$env:TEMP\grain-setup.log") { Get-Content "$env:TEMP\grain-setup.log" }
+            if (Test-Path $install) { Get-ChildItem $install -Recurse | Select-Object FullName }
+            throw "Silent install smoke test failed"
+          }
           & "$install\Uninstall Grain.exe" --silent --dir $install
           if ($LASTEXITCODE) { throw "Silent uninstall smoke test failed" }
           Start-Sleep -Seconds 6
