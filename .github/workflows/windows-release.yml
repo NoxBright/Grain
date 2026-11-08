@@ -104,8 +104,8 @@ jobs:
         run: |
           $installer = (Get-ChildItem "dist\Grain Setup *.exe" | Select-Object -First 1).FullName
           $install = Join-Path $env:RUNNER_TEMP "grain-install"
-          & $installer --silent --dir $install --no-shortcuts --no-registry --no-launch
-          $installCode = $LASTEXITCODE
+          $installProcess = Start-Process -FilePath $installer -ArgumentList @("--silent", "--dir", $install, "--no-shortcuts", "--no-registry", "--no-launch") -Wait -PassThru
+          $installCode = $installProcess.ExitCode
           if ($installCode -or -not (Test-Path "$install\Grain App.exe")) {
             Write-Host "Installer exit code: $installCode"
             if (Test-Path "$env:TEMP\grain-setup.log") { Get-Content "$env:TEMP\grain-setup.log" }
