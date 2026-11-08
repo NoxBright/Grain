@@ -50,7 +50,7 @@ header { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, va
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
 header .wrap { display: flex; align-items: center; gap: 20px; height: 60px; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; color: var(--text); text-decoration: none; }
-.brand img { width: 24px; height: 24px; image-rendering: pixelated; }
+.brand img { width: 32px; height: 32px; image-rendering: pixelated; }
 header nav { display: flex; gap: 22px; margin-left: auto; font-size: 14.5px; }
 header nav a { color: var(--muted); text-decoration: none; }
 header nav a:hover { color: var(--text); }
@@ -112,7 +112,6 @@ h1 em { font-style: normal; color: var(--accent); }
 
 /* sections */
 section { padding: 76px 0; }
-section + section { border-top: 1px solid var(--line); }
 .kicker { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
 h2 { text-wrap: balance; font-size: clamp(28px, 3.6vw, 38px); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 14px; }
 .intro { color: var(--muted); font-size: 17.5px; max-width: 40em; margin: 0 0 40px; }
@@ -186,7 +185,7 @@ footer a:hover { color: var(--text); }
 
 <header>
   <div class="wrap">
-    <a class="brand" href="#top"><img src="grain-big.png" alt="" width="24" height="24">Grain</a>
+    <a class="brand" href="#top"><img src="grain-big.png" alt="" width="32" height="32">Grain</a>
     <nav aria-label="Sections">
       <a href="#how">How it works</a>
       <a href="#features">Features</a>
