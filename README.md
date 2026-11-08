@@ -225,6 +225,8 @@ Windows actions (opening programs, key presses, locking, timers, the browser, th
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
+For the maintainer release checklist, see [RELEASING.md](RELEASING.md).
+
 This produces:
 - **`dist\Grain\`:** the app folder. A PyInstaller folder build, which is less likely to trip antivirus than a single self-unpacking exe. It holds the models, the default tools and plugins (copied into each user's data folder on first run), `THIRD_PARTY_NOTICES.txt` with a `licenses\` folder, a user `README.txt`, the changelog and `Uninstall Grain.exe`.
 - **`dist\Grain Setup <version>.exe`:** the per-user installer ([installer/grain_setup.py](installer/grain_setup.py)).
@@ -233,6 +235,8 @@ This produces:
   - It's listed in Installed apps.
   - Silent use: `--silent [--dir PATH] [--desktop] [--startup] [--no-launch]`. Uninstall with `"Uninstall Grain.exe" --silent [--remove-data]`. Silent mode never shows a dialog: failures go to `%TEMP%\grain-setup.log` and exit code 1.
   - It refuses to install into, or uninstall from, a folder that isn't a Grain install.
+
+The build environment needs both runtime and Windows build dependencies:
 
 ```powershell
 py -3.11 -m venv .venv
