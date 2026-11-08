@@ -69,6 +69,7 @@ try {
 
     # Licences and docs
     & $py dev\make_notices.py $app
+    if ($LASTEXITCODE) { throw "generating third-party notices failed" }
     Copy-Item dist-files\README.txt, CHANGELOG.md "$app\"
     Copy-Item LICENSE "$app\LICENSE.txt"
 

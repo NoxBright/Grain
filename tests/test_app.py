@@ -179,6 +179,17 @@ class Api(unittest.TestCase):
         self.startup_mock.assert_called_with(True)
         self.assertTrue(os.path.exists(self.grain.config.path))
 
+    def test_malformed_tool_metadata_is_rejected(self):
+        tool = {"name": "bad_metadata", "description": "A bad tool.", "parameters": {},
+                "threshold": "very sure", "keywords": ["ok"]}
+        status, data = self.call("PUT", "/v1/tool_files/bad_metadata", tool)
+        self.assertEqual(status, 400, data)
+
+        tool["threshold"] = 0.5
+        tool["keywords"] = [5]
+        status, data = self.call("PUT", "/v1/tool_files/bad_metadata", tool)
+        self.assertEqual(status, 400, data)
+
     def test_port_change_says_restart(self):
         status, data = self.call("PUT", "/v1/settings", {"api_port": 8799})
         self.assertEqual(data["restart_needed"], ["api_port"])

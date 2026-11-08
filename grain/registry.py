@@ -15,6 +15,7 @@ SAFETY = ("run", "confirm", "strict")  # strict: needs at least STRICT_THRESHOLD
 STRICT_THRESHOLD = 0.8
 NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 JSON_TYPES = {str: "string", int: "integer", float: "number", bool: "boolean", list: "array", dict: "object"}
+SCHEMA_TYPES = set(JSON_TYPES.values())
 
 
 @dataclass
@@ -40,8 +41,33 @@ class Tool:
             raise ValueError(f"safety must be one of {', '.join(SAFETY)}")
         if not self.description.strip():
             raise ValueError(f"tool {self.name!r} needs a description")
+        if self.threshold is not None and (isinstance(self.threshold, bool)
+                                           or not isinstance(self.threshold, (int, float))
+                                           or not 0 <= self.threshold <= 1):
+            raise ValueError(f"tool {self.name!r} threshold must be a number between 0 and 1")
+        if not isinstance(self.keywords, list) or not all(isinstance(word, str) for word in self.keywords):
+            raise ValueError(f"tool {self.name!r} keywords must be a list of strings")
+        self._validate_parameters()
         for phrase in self.phrases:
             compile_phrase(phrase, self.parameters)  # raises on a bad phrase
+
+    def _validate_parameters(self):
+        if not isinstance(self.parameters, dict) or self.parameters.get("type") != "object":
+            raise ValueError(f"tool {self.name!r} parameters must be an object schema")
+        properties = self.parameters.get("properties", {})
+        required = self.parameters.get("required", [])
+        if not isinstance(properties, dict) or not isinstance(required, list) \
+                or not all(isinstance(name, str) for name in required):
+            raise ValueError(f"tool {self.name!r} has an invalid parameter schema")
+        if not all(name in properties for name in required):
+            raise ValueError(f"tool {self.name!r} requires an unknown parameter")
+        for name, spec in properties.items():
+            if not isinstance(name, str) or not isinstance(spec, dict) \
+                    or spec.get("type", "string") not in SCHEMA_TYPES:
+                raise ValueError(f"tool {self.name!r} parameter {name!r} has an invalid type")
+            if "enum" in spec and (not isinstance(spec["enum"], list)
+                                    or not spec["enum"]):
+                raise ValueError(f"tool {self.name!r} parameter {name!r} has an invalid enum")
 
     def schema(self):
         return {"name": self.name, "description": self.description, "parameters": self.parameters}
