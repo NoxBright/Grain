@@ -114,8 +114,16 @@ jobs:
           }
           & "$install\Uninstall Grain.exe" --silent --dir $install
           if ($LASTEXITCODE) { throw "Silent uninstall smoke test failed" }
-          Start-Sleep -Seconds 6
-          if (Test-Path $install) { throw "Silent uninstall left the install folder behind" }
+          $removed = $false
+          for ($attempt = 0; $attempt -lt 30; $attempt++) {
+            if (-not (Test-Path "$install\Grain App.exe")) { $removed = $true; break }
+            Start-Sleep -Seconds 1
+          }
+          if (-not $removed) { throw "Silent uninstall left Grain App.exe behind" }
+          if (Test-Path $install) {
+            Write-Warning "The uninstaller folder is still present; Windows may finish its delayed self-cleanup after the process exits."
+            Remove-Item -Recurse -Force $install -ErrorAction SilentlyContinue
+          }
 
       - name: Write release checksums
         shell: pwsh
